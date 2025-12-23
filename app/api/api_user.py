@@ -23,7 +23,7 @@ def get(user_service: UserService = Depends()) -> Any:
         users = user_service.get_users()
         return DataResponse().success_response(data=users)
     except Exception as e:
-        return HTTPException(status_code=400, detail=str(e))
+        raise CustomException(http_code=400, code='400', message=str(e))
 
 
 @router.get("/me", dependencies=[Depends(login_required)], response_model=DataResponse[UserItemResponse])
