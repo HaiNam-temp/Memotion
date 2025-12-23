@@ -116,3 +116,67 @@ Nếu người dùng đăng ký với vai trò là **CARETAKER**:
   "message": "Patient email and full name are required for Caretaker registration"
 }
 ```
+
+## 3. Task Management (Quản lý nhiệm vụ)
+
+### 3.1. Get Patient Tasks by Date (Xem nhiệm vụ của bệnh nhân theo ngày)
+
+API dành riêng cho **Bệnh nhân (PATIENT)** để xem danh sách các nhiệm vụ của chính mình trong một ngày cụ thể.
+
+*   **URL**: `/api/tasks/patient/by-date`
+*   **Method**: `GET`
+*   **Headers**:
+    *   `Authorization`: `Bearer <access_token>` (Token của Patient)
+
+#### Query Parameters
+
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `task_date` | date | **Yes** | Ngày cần xem nhiệm vụ. Định dạng: `YYYY-MM-DD`. |
+
+#### Response
+
+Trả về danh sách các nhiệm vụ của bệnh nhân trong ngày.
+
+```json
+{
+  "data": [
+    {
+      "title": "Uống thuốc sáng",
+      "description": "Uống 1 viên Panadol sau ăn",
+      "task_date": "2023-10-27",
+      "task_time": "08:00:00",
+      "task_type": "MEDICATION",
+      "status": "PENDING",
+      "owner_type": "PATIENT",
+      "task_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "care_plan_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "medication_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "nutrition_id": null,
+      "exercise_id": null,
+      "linked_task_id": null
+    },
+    {
+      "title": "Tập vật lý trị liệu",
+      "description": "Bài tập co duỗi chân",
+      "task_date": "2023-10-27",
+      "task_time": "10:00:00",
+      "task_type": "EXERCISE",
+      "status": "COMPLETED",
+      "owner_type": "PATIENT",
+      "task_id": "3fa85f64-5717-4562-b3fc-2c963f66afa7",
+      "care_plan_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "medication_id": null,
+      "nutrition_id": null,
+      "exercise_id": "3fa85f64-5717-4562-b3fc-2c963f66afa8",
+      "linked_task_id": null
+    }
+  ]
+}
+```
+
+#### Error Responses
+
+*   **400 Bad Request**: Lỗi định dạng ngày hoặc lỗi hệ thống.
+*   **401 Unauthorized**: Chưa đăng nhập hoặc token hết hạn.
+*   **403 Forbidden**: Người dùng không phải là Patient.

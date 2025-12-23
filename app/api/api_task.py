@@ -36,6 +36,18 @@ def get_patient_tasks_by_date(
     except Exception as e:
         raise CustomException(http_code=400, code='400', message=str(e))
 
+@router.get('/patient/medication-tasks', dependencies=[Depends(login_required)], response_model=DataResponse[List[TaskDetailResponse]])
+def get_patient_medication_tasks_by_date(
+    task_date: date = Query(..., description="Date to filter tasks (YYYY-MM-DD)"),
+    task_service: TaskService = Depends(),
+    current_user: User = Depends(UserService.get_current_user)
+) -> Any:
+    try:
+        tasks = task_service.get_patient_medication_tasks_by_date(task_date, current_user)
+        return DataResponse().success_response(data=tasks)
+    except Exception as e:
+        raise CustomException(http_code=400, code='400', message=str(e))
+
 @router.put('/patient/{task_id}/complete', dependencies=[Depends(login_required)], response_model=DataResponse[TaskResponse])
 def complete_task(
     task_id: str,

@@ -228,5 +228,30 @@ Việc đặt tên nhất quán giúp code dễ đọc và dễ hiểu hơn.
 *   **Filtering, Sorting, Paging**:
     *   Sử dụng query parameters: `GET /users?page=1&limit=10&sort=-created_at&role=admin`.
 
+### 6.4. Standard Response Format
+
+Tất cả các API **BẮT BUỘC** phải trả về response theo cấu trúc chuẩn được định nghĩa trong `app.schemas.sche_base`.
+
+*   **Cấu trúc chuẩn**:
+    ```json
+    {
+        "success": true,
+        "message": "Thành công",
+        "data": { ... }
+    }
+    ```
+*   **Thành công**: Sử dụng `DataResponse[T].success_response(data=...)`.
+*   **Lỗi**:
+    *   Sử dụng `CustomException(http_code=..., code=..., message=...)` để throw lỗi.
+    *   Exception handler sẽ tự động bắt và trả về format chuẩn:
+        ```json
+        {
+            "success": false,
+            "message": "Chi tiết lỗi",
+            "data": null
+        }
+        ```
+*   **Tuyệt đối KHÔNG** return trực tiếp dictionary hoặc `HTTPException` của FastAPI (trừ khi đã được wrap bởi handler).
+
 ---
 *Tài liệu này dùng để định hướng phát triển cho team Memotion.*

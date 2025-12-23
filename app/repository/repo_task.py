@@ -39,3 +39,11 @@ class TaskRepository:
             Task.task_date == task_date,
             Task.owner_type == owner_type
         ).all()
+
+    def get_medication_tasks_by_date(self, care_plan_id: str, task_date: date, owner_type: str) -> List[Task]:
+        return self.db.query(Task).join(MedicationLibrary, Task.medication_id == MedicationLibrary.medication_id).filter(
+            Task.care_plan_id == care_plan_id,
+            Task.task_date == task_date,
+            Task.owner_type == owner_type,
+            Task.task_type == 'MEDICATION'
+        ).all()

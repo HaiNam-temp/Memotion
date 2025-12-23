@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Date, Time, ForeignKey, Text
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.model_base import Base
 import uuid
@@ -19,3 +20,5 @@ class Task(Base):
     exercise_id = Column(UUID(as_uuid=True), ForeignKey("exercise_library.exercise_id", ondelete="SET NULL"))
     status = Column(String(20), default='PENDING')
     linked_task_id = Column(UUID(as_uuid=True), ForeignKey("task.task_id", ondelete="SET NULL"))
+
+    medication = relationship("MedicationLibrary", foreign_keys=[medication_id], lazy="joined")

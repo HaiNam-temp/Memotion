@@ -58,6 +58,26 @@ class TaskService:
         )
         return tasks
 
+    def get_patient_medication_tasks_by_date(self, task_date: date, current_user: User) -> List[TaskDetailResponse]:
+        care_plan = self.task_repo.get_care_plan_by_patient_id(current_user.user_id)
+        if not care_plan:
+            raise Exception("Care plan not found for this patient.")
+
+        tasks = self.task_repo.get_medication_tasks_by_date(
+            care_plan_id=care_plan.care_plan_id,
+            task_date=task_date,
+            owner_type=UserRole.PATIENT.value
+        )
+        
+        response_list = []
+        for task in tasks:
+            task_resp = TaskDetailResponse.from_orm(task)
+            if task.medication:
+                task_resp.medication_detail = MedicationDetail.from_orm(task.medication)
+            response_list.append(task_resp)
+            
+        return response_list
+
     def complete_task(self, task_id: str, current_user: User):
         if current_user.role != UserRole.PATIENT.value:
             raise Exception("Access denied. Only patients can complete tasks.")
