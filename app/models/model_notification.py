@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, func
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.model_base import Base
 import uuid
@@ -14,3 +15,5 @@ class Notification(Base):
     type = Column(String(50), nullable=False)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())
+
+    task = relationship("Task", foreign_keys=[task_id], lazy="joined")

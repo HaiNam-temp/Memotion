@@ -5,12 +5,34 @@ from fastapi import APIRouter, Depends, Query
 from app.helpers.exception_handler import CustomException
 from app.helpers.login_manager import login_required
 from app.schemas.sche_base import DataResponse
-from app.schemas.sche_task import TaskResponse, TaskDetailResponse
+from app.schemas.sche_task import TaskResponse, TaskDetailResponse, CaretakerTaskResponse
 from app.services.srv_task import TaskService
 from app.services.srv_user import UserService
 from app.models.model_user import User
 
 router = APIRouter()
+
+@router.get('/caretaker/tasks', dependencies=[Depends(login_required)], response_model=DataResponse[List[TaskResponse]])
+def get_caretaker_tasks(
+    task_service: TaskService = Depends(),
+    current_user: User = Depends(UserService.get_current_user)
+) -> Any:
+    try:
+        tasks = task_service.get_caretaker_tasks(current_user)
+        return DataResponse().success_response(data=tasks)
+    except Exception as e:
+        raise CustomException(http_code=400, code='400', message=str(e))
+
+@router.get('/caretaker/tasks-with-patient-info', dependencies=[Depends(login_required)], response_model=DataResponse[List[CaretakerTaskResponse]])
+def get_caretaker_tasks_with_patient_info(
+    task_service: TaskService = Depends(),
+    current_user: User = Depends(UserService.get_current_user)
+) -> Any:
+    try:
+        tasks = task_service.get_caretaker_tasks_with_linked_info(current_user)
+        return DataResponse().success_response(data=tasks)
+    except Exception as e:
+        raise CustomException(http_code=400, code='400', message=str(e))
 
 @router.get('/{task_id}', dependencies=[Depends(login_required)], response_model=DataResponse[TaskDetailResponse])
 def get_task_detail(

@@ -37,14 +37,14 @@ class CustomException(Exception):
 async def http_exception_handler(request: Request, exc: CustomException):
     return JSONResponse(
         status_code=exc.http_code,
-        content=jsonable_encoder(ResponseSchemaBase().custom_response(False, exc.message))
+        content=jsonable_encoder(ResponseSchemaBase().custom_response(exc.code, exc.message))
     )
 
 
 async def validation_exception_handler(request, exc):
     return JSONResponse(
         status_code=400,
-        content=jsonable_encoder(ResponseSchemaBase().custom_response(False, get_message_validation(exc)))
+        content=jsonable_encoder(ResponseSchemaBase().custom_response('400', get_message_validation(exc)))
     )
 
 

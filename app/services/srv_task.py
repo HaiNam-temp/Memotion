@@ -2,13 +2,15 @@ from datetime import date
 from typing import List
 from fastapi import Depends
 from app.repository.repo_task import TaskRepository
+from app.repository.repo_user import UserRepository
 from app.models.model_user import User
 from app.helpers.enums import UserRole
-from app.schemas.sche_task import TaskDetailResponse, MedicationDetail, NutritionDetail, ExerciseDetail
+from app.schemas.sche_task import TaskDetailResponse, MedicationDetail, NutritionDetail, ExerciseDetail, TaskResponse, CaretakerTaskResponse
 
 class TaskService:
-    def __init__(self, task_repo: TaskRepository = Depends()):
+    def __init__(self, task_repo: TaskRepository = Depends(), user_repo: UserRepository = Depends()):
         self.task_repo = task_repo
+        self.user_repo = user_repo
 
     def get_task_detail(self, task_id: str, current_user: User) -> TaskDetailResponse:
         task = self.task_repo.get_task_by_id(task_id)
@@ -77,6 +79,38 @@ class TaskService:
             response_list.append(task_resp)
             
         return response_list
+
+    def get_caretaker_tasks(self, current_user: User) -> List[TaskResponse]:
+        if current_user.role != UserRole.CARETAKER.value:
+            raise Exception("Access denied. Only caretakers can access this.")
+
+        patient_id = self.user_repo.get_patient_id_by_caretaker(current_user.user_id)
+        if not patient_id:
+            raise Exception("No patient assigned to this caretaker.")
+
+        care_plan = self.task_repo.get_care_plan_by_patient_id(patient_id)
+        if not care_plan:
+            # It's possible the patient has no care plan yet. Return empty list.
+            return []
+
+        tasks = self.task_repo.get_tasks_by_care_plan(care_plan.care_plan_id)
+        return [TaskResponse.from_orm(task) for task in tasks]
+
+    def get_caretaker_tasks_with_linked_info(self, current_user: User) -> List[CaretakerTaskResponse]:
+        if current_user.role != UserRole.CARETAKER.value:
+            raise Exception("Access denied. Only caretakers can access this.")
+
+        patient_id = self.user_repo.get_patient_id_by_caretaker(current_user.user_id)
+        if not patient_id:
+            raise Exception("No patient assigned to this caretaker.")
+
+        care_plan = self.task_repo.get_care_plan_by_patient_id(patient_id)
+        if not care_plan:
+            return []
+
+        tasks = self.task_repo.get_caretaker_tasks(care_plan.care_plan_id)
+        
+        return [CaretakerTaskResponse.from_orm(task) for task in tasks]
 
     def complete_task(self, task_id: str, current_user: User):
         if current_user.role != UserRole.PATIENT.value:

@@ -1,13 +1,12 @@
 from typing import Optional
 from pydantic import BaseModel
-from datetime import date, time
+from datetime import datetime
 from uuid import UUID
 
 class TaskBase(BaseModel):
     title: str
     description: Optional[str] = None
-    task_date: date
-    task_time: time
+    task_duedate: datetime
     task_type: str
     status: str
     owner_type: str
@@ -22,6 +21,9 @@ class TaskResponse(TaskBase):
 
     class Config:
         orm_mode = True
+
+class CaretakerTaskResponse(TaskResponse):
+    linked_task: Optional[TaskResponse] = None
 
 class MedicationDetail(BaseModel):
     medication_id: UUID

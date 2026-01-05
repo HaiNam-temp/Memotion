@@ -1,7 +1,8 @@
 from typing import List, Optional
 from datetime import date
 from fastapi import Depends
-from sqlalchemy.orm import Session
+from sqlalchemy import cast, Date
+from sqlalchemy.orm import Session, joinedload
 from app.db.base import get_db
 from app.models.model_task import Task
 from app.models.model_care_plan import CarePlan
@@ -36,14 +37,23 @@ class TaskRepository:
     def get_tasks_by_date(self, care_plan_id: str, task_date: date, owner_type: str) -> List[Task]:
         return self.db.query(Task).filter(
             Task.care_plan_id == care_plan_id,
-            Task.task_date == task_date,
+            cast(Task.task_duedate, Date) == task_date,
             Task.owner_type == owner_type
         ).all()
 
     def get_medication_tasks_by_date(self, care_plan_id: str, task_date: date, owner_type: str) -> List[Task]:
         return self.db.query(Task).join(MedicationLibrary, Task.medication_id == MedicationLibrary.medication_id).filter(
             Task.care_plan_id == care_plan_id,
-            Task.task_date == task_date,
+            cast(Task.task_duedate, Date) == task_date,
             Task.owner_type == owner_type,
             Task.task_type == 'MEDICATION'
+        ).all()
+
+    def get_tasks_by_care_plan(self, care_plan_id: str) -> List[Task]:
+        return self.db.query(Task).filter(Task.care_plan_id == care_plan_id).all()
+
+    def get_caretaker_tasks(self, care_plan_id: str) -> List[Task]:
+        return self.db.query(Task).options(joinedload(Task.linked_task)).filter(
+            Task.care_plan_id == care_plan_id,
+            Task.owner_type == 'CARETAKER'
         ).all()

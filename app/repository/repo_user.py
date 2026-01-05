@@ -40,3 +40,7 @@ class UserRepository:
         self.db.add(patient_caretaker)
         self.db.commit()
         return patient_caretaker
+
+    def get_patient_id_by_caretaker(self, caretaker_id: str) -> Optional[str]:
+        result = self.db.query(PatientCaretaker.patient_id).filter(PatientCaretaker.caretaker_id == caretaker_id).first()
+        return result[0] if result else None

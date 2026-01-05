@@ -9,36 +9,36 @@ T = TypeVar("T")
 class ResponseSchemaBase(BaseModel):
     __abstract__ = True
 
-    success: bool = True
+    code: str = '200'
     message: str = ''
 
-    def custom_response(self, success: bool, message: str):
-        self.success = success
+    def custom_response(self, code: str, message: str):
+        self.code = code
         self.message = message
         return self
 
     def success_response(self):
-        self.success = True
+        self.code = '200'
         self.message = 'Thành công'
         return self
 
 
 class DataResponse(GenericModel, Generic[T]):
-    success: bool = True
+    code: str = '200'
     message: str = ''
     data: Optional[T] = None
 
     class Config:
         arbitrary_types_allowed = True
 
-    def custom_response(self, success: bool, message: str, data: T):
-        self.success = success
+    def custom_response(self, code: str, message: str, data: T):
+        self.code = code
         self.message = message
         self.data = data
         return self
 
     def success_response(self, data: T):
-        self.success = True
+        self.code = '200'
         self.message = 'Thành công'
         self.data = data
         return self
