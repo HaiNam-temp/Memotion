@@ -19,7 +19,7 @@ COPY app/requirements.txt .
 # Upgrade pip and create wheels for dependencies
 # Creating wheels allows us to compile once and install quickly in the next stage
 RUN pip install --upgrade pip && \
-    pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+    pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
 
 # Stage 2: Runtime image
