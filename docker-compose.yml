@@ -1,29 +1,6 @@
 version: '3.8'
 
 services:
-  # Backend Service
-  memotion-be:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-    container_name: memotion-be
-    # Override command to enable reload for development, remove --reload for production
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8005 --reload
-    volumes:
-      # Mount current directory to /app for hot reloading in development
-      - .:/app
-    ports:
-      - "8005:8005"
-    environment:
-      - PROJECT_NAME=Memotion
-      - SQL_DATABASE_URL=postgresql://memotion_user:memotion_password@db:5432/memotion_db
-      # Add other environment variables from .env here if needed
-    depends_on:
-      - db
-    networks:
-      - memotion-network
-
-  # Database Service
   db:
     image: postgres:15-alpine
     container_name: memotion-db
@@ -31,8 +8,8 @@ services:
       # Map host port 5333 to container port 5432
       - "5333:5333"
     environment:
-      - POSTGRES_USER=memotion_user
-      - POSTGRES_PASSWORD=memotion_password
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=memotion_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
