@@ -253,5 +253,30 @@ Tất cả các API **BẮT BUỘC** phải trả về response theo cấu trúc
         ```
 *   **Tuyệt đối KHÔNG** return trực tiếp dictionary hoặc `HTTPException` của FastAPI (trừ khi đã được wrap bởi handler).
 
+## 7. Logging Guidelines
+
+Việc ghi log là bắt buộc để theo dõi hoạt động của hệ thống và debug lỗi.
+
+*   **Import Logger**:
+    ```python
+    import logging
+    logger = logging.getLogger(__name__)
+    ```
+*   **Log Levels**:
+    *   `INFO`: Ghi lại các sự kiện quan trọng (Request nhận được, xử lý thành công).
+    *   `ERROR`: Ghi lại lỗi xảy ra (Exception).
+    *   `DEBUG`: Ghi lại thông tin chi tiết để debug (chỉ bật khi cần thiết).
+*   **Format Log**:
+    *   **Request**: `logger.info(f"{function_name} request: user_id={user_id}, data={data}")`
+    *   **Success**: `logger.info(f"{function_name} success: result_id={id}")`
+    *   **Error**: `logger.error(f"{function_name} error: {str(e)}", exc_info=True)`
+*   **Clean Log**:
+    *   Log ngắn gọn, đủ thông tin.
+    *   Không log thông tin nhạy cảm (password, token).
+    *   Luôn dùng `exc_info=True` khi log error để in ra stack trace.
+
+
+
 ---
 *Tài liệu này dùng để định hướng phát triển cho team Memotion.*
+

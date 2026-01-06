@@ -1,9 +1,12 @@
 from typing import Optional
+
+
+from uuid import UUID
 from pydantic import BaseModel
-from app.helpers.enums import DiseaseType
+from app.helpers.enums import DiseaseType, Gender
 
 class PatientProfileBase(BaseModel):
-    gender: Optional[str] = None
+    gender: Optional[Gender] = None
     living_arrangement: Optional[str] = None
     bmi_score: Optional[int] = None
     map_score: Optional[int] = None
@@ -30,8 +33,8 @@ class PatientProfileUpdateRequest(BaseModel):
     condition_note: Optional[str] = None
 
 class PatientProfileResponse(PatientProfileBase):
-    profile_id: str
-    patient_id: str
+    profile_id: UUID
+    patient_id: UUID
 
     class Config:
         orm_mode = True
@@ -61,7 +64,7 @@ class PhysicalTherapyUpdateRequest(PhysicalTherapyBase):
     pass
 
 class PhysicalTherapyResponse(PhysicalTherapyBase):
-    profile_id: str
+    profile_id: UUID
 
     class Config:
         orm_mode = True

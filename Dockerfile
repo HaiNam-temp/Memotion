@@ -1,0 +1,54 @@
+# Stage 1: Build dependencies
+FROM python:3.10-slim as builder
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Update and install system dependencies required for building python packages
+# gcc and build-essential are often needed for numpy, pandas, etc.
+# libpq-dev is needed to build psycopg2
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc libpq-dev build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy requirements file
+COPY app/requirements.txt .
+
+# Upgrade pip and create wheels for dependencies
+# Creating wheels allows us to compile once and install quickly in the next stage
+RUN pip install --upgrade pip && \
+    pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+
+# Stage 2: Runtime image
+FROM python:3.10-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Install runtime library for postgres (libpq5)
+# We don't need gcc or build tools here, keeping the image small
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpq5 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy wheels and requirements from builder stage
+COPY --from=builder /app/wheels /wheels
+COPY --from=builder /app/requirements.txt .
+
+# Install dependencies from wheels
+RUN pip install --no-cache /wheels/*
+
+# Copy the rest of the application code
+COPY . .
+
+# Expose the port the app runs on
+EXPOSE 8005
+
+# Command to run the application
+# Using uvicorn directly
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8005"]

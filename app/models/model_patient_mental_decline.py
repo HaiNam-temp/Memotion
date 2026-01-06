@@ -6,7 +6,7 @@ class PatientMentalDecline(Base):
     __tablename__ = "patient_mental_decline"
 
     profile_id = Column(UUID(as_uuid=True), ForeignKey("patient_profile.profile_id", ondelete="CASCADE"), primary_key=True)
-    mmse_score = Column("MMSE_score", Integer)
+    mmse_score = Column(Integer)
     previous_illness = Column(String(255))
     previous_treatments = Column(String(255))
     functional_assessment_staging_test_score = Column(Integer)

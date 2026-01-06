@@ -4,7 +4,7 @@ from sqlalchemy import Column, Integer, DateTime, MetaData
 from sqlalchemy.ext.declarative import as_declarative, declared_attr
 
 
-@as_declarative(metadata=MetaData(schema="memotion"))
+@as_declarative(metadata=MetaData(schema="public"))
 class Base:
     __abstract__ = True
     __name__: str

@@ -1,4 +1,5 @@
 import jwt
+import logging
 from typing import Optional
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer
@@ -13,6 +14,10 @@ from app.schemas.sche_token import TokenPayload
 from app.schemas.sche_user import UserCreateRequest, UserUpdateMeRequest, UserUpdateRequest, UserRegisterRequest
 from app.repository.repo_user import UserRepository
 from app.helpers.enums import UserRole
+
+from app.helpers.exception_handler import CustomException
+
+logger = logging.getLogger(__name__)
 
 reusable_oauth2 = HTTPBearer(
     scheme_name='Authorization'
@@ -41,17 +46,22 @@ class UserService:
                 algorithms=[settings.SECURITY_ALGORITHM]
             )
             token_data = TokenPayload(**payload)
-        except (jwt.PyJWTError, ValidationError):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Could not validate credentials",
+        except (jwt.PyJWTError, ValidationError) as e:
+            logger.error(f"Credential validation failed: {e}")
+            raise CustomException(
+                http_code=status.HTTP_403_FORBIDDEN,
+                code='403',
+                message="Could not validate credentials"
             )
         # Note: Ideally we should use UserRepository here too, but for static dependency it's harder.
         # We can use db.session directly or refactor to use a class dependency.
         # For now, direct query is acceptable for this helper.
         user = db.session.query(User).filter(User.user_id == token_data.user_id).first()
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+            logger.error(f"User not found: {token_data.user_id}")
+            raise CustomException(http_code=404, code='404', message="User not found")
+        
+        logger.info(f"User authenticated: {user.email}")
         return user
 
     def register_user(self, data: UserRegisterRequest):

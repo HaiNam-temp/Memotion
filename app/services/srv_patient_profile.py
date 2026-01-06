@@ -16,7 +16,7 @@ class PatientProfileService:
 
         new_profile = PatientProfile(
             patient_id=current_user.user_id,
-            gender=data.gender,
+            gender=data.gender.value if data.gender else None,
             living_arrangement=data.living_arrangement,
             bmi_score=data.bmi_score,
             map_score=data.map_score,
@@ -41,7 +41,7 @@ class PatientProfileService:
             raise Exception("Patient profile not found")
         
         if data.gender is not None:
-            profile.gender = data.gender
+            profile.gender = data.gender.value
         if data.living_arrangement is not None:
             profile.living_arrangement = data.living_arrangement
         if data.bmi_score is not None:

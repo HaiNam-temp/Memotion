@@ -1,5 +1,6 @@
 from typing import Any, List
 from datetime import date
+import logging
 from fastapi import APIRouter, Depends, Query
 
 from app.helpers.exception_handler import CustomException
@@ -9,6 +10,8 @@ from app.schemas.sche_task import TaskResponse, TaskDetailResponse, CaretakerTas
 from app.services.srv_task import TaskService
 from app.services.srv_user import UserService
 from app.models.model_user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -77,7 +80,10 @@ def complete_task(
     current_user: User = Depends(UserService.get_current_user)
 ) -> Any:
     try:
+        logger.info(f"complete_task request: task_id={task_id}, user_id={current_user.user_id}")
         task = task_service.complete_task(task_id, current_user)
+        logger.info(f"complete_task success: task_id={task_id}")
         return DataResponse().success_response(data=task)
     except Exception as e:
+        logger.error(f"complete_task error: {e}")
         raise CustomException(http_code=400, code='400', message=str(e))

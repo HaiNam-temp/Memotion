@@ -46,7 +46,7 @@ def get_application() -> FastAPI:
     application.include_router(router, prefix=settings.API_PREFIX)
     application.add_exception_handler(CustomException, http_exception_handler)
     
-    application.mount("/static", StaticFiles(directory="static"), name="static")
+    # application.mount("/static", StaticFiles(directory="static"), name="static")
 
     for route in application.routes:
         print(f"Route: {route.path} {route.methods}")

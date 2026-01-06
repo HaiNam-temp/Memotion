@@ -124,5 +124,5 @@ class TaskService:
         if not care_plan or task.care_plan_id != care_plan.care_plan_id:
              raise Exception("Access denied. Task does not belong to your care plan.")
         
-        task.status = 'COMPLETED'
+        task.status = 'DONE'
         return self.task_repo.update_task(task)
