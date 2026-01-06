@@ -50,9 +50,9 @@ jobs:
           mkdir -p ~/.ssh
           echo "$SERVER_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
-          scp -i ~/.ssh/deploy_key fastapi_app.tar ${SERVER_USER}@${SERVER_HOST}:~/
-          ssh -i ~/.ssh/deploy_key ${SERVER_USER}@${SERVER_HOST} << EOF
+          ssh-keyscan -p 2222 -H $SERVER_HOST >> ~/.ssh/known_hosts
+          scp -P 2222 -i ~/.ssh/deploy_key fastapi_app.tar ${SERVER_USER}@${SERVER_HOST}:~/
+          ssh -p 2222 -i ~/.ssh/deploy_key ${SERVER_USER}@${SERVER_HOST} << EOF
             docker load -i ~/fastapi_app.tar
             docker stop ${DOCKER_CONTAINER} || true
             docker rm ${DOCKER_CONTAINER} || true
