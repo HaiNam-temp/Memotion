@@ -1,10 +1,10 @@
 # Stage 1: Build dependencies
-FROM python:3.10-slim as builder
+FROM python:3.10-slim AS builder
 
 WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Update and install system dependencies required for building python packages
 # gcc and build-essential are often needed for numpy, pandas, etc.
@@ -27,8 +27,8 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Install runtime library for postgres (libpq5)
 # We don't need gcc or build tools here, keeping the image small
