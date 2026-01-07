@@ -50,5 +50,8 @@ COPY . .
 EXPOSE 8005
 
 # Command to run the application
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8005"]
+
+# Command to run the application
 # Using uvicorn directly
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8005"]
