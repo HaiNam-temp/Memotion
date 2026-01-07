@@ -56,5 +56,11 @@ jobs:
             docker load -i ~/fastapi_app.tar
             docker stop ${DOCKER_CONTAINER} || true
             docker rm ${DOCKER_CONTAINER} || true
-            docker run -d --name ${DOCKER_CONTAINER} -p ${PORT} ${DOCKER_IMAGE}
+            docker run -d --name ${DOCKER_CONTAINER} \
+              --restart unless-stopped \
+              --add-host host.docker.internal:host-gateway \
+              -e SQL_DATABASE_URL="postgresql://postgres:postgres@host.docker.internal:5333/memotion_db" \
+              -e SECRET_KEY="changeme" \
+              -e PROJECT_NAME="Memotion" \
+              -p ${PORT} ${DOCKER_IMAGE}
           EOF
