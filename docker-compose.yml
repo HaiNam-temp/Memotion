@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15-alpine
     container_name: memotion-db
     ports:
       # Map host port 5333 to container port 5432
-      - "5333:5333"
+      - "5333:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
