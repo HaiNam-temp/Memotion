@@ -79,6 +79,25 @@ class PatientProfileService:
             
         return self.profile_repo.update_profile(profile)
 
+    def delete_patient_profile(self, current_user: User):
+        profile = self.profile_repo.get_profile_by_patient_id(current_user.user_id)
+        if not profile:
+            raise Exception("Patient profile not found")
+        
+        # Check if current user is the patient or caretaker
+        if current_user.role == UserRole.PATIENT.value:
+            # Patient can delete their own profile
+            pass
+        elif current_user.role == UserRole.CARETAKER.value:
+            # Caretaker can delete profile of their assigned patient
+            assigned_patient = self.user_repo.get_assigned_patient(current_user.user_id)
+            if not assigned_patient or assigned_patient.user_id != profile.patient_id:
+                raise Exception("Unauthorized to delete this profile")
+        else:
+            raise Exception("Unauthorized role")
+        
+        self.profile_repo.delete_profile(profile)
+
     def create_physical_therapy_profile(self, data: PhysicalTherapyCreateRequest, current_user: User):
         # Check if current user is a caretaker
         if current_user.role != UserRole.CARETAKER.value:
@@ -180,3 +199,30 @@ class PatientProfileService:
             therapy.note = data.note
             
         return self.profile_repo.update_physical_therapy(therapy)
+
+    def delete_physical_therapy_profile(self, current_user: User):
+        profile = self.profile_repo.get_profile_by_patient_id(current_user.user_id)
+        if not profile:
+            raise Exception("Patient profile not found")
+        
+        therapy = self.profile_repo.get_physical_therapy_by_profile_id(profile.profile_id)
+        if not therapy:
+            raise Exception("Physical therapy profile not found")
+
+        # Check if current user is the patient or caretaker
+        if current_user.role == UserRole.PATIENT.value:
+            # Patient can delete their own profile
+            pass
+        elif current_user.role == UserRole.CARETAKER.value:
+            # Caretaker can delete profile of their assigned patient
+            assigned_patient = self.user_repo.get_assigned_patient(current_user.user_id)
+            if not assigned_patient or assigned_patient.user_id != profile.patient_id:
+                raise Exception("Unauthorized to delete this profile")
+        else:
+            raise Exception("Unauthorized role")
+        
+        self.profile_repo.delete_physical_therapy(therapy)
+        
+        # Update profile to remove physical_therapy_id
+        profile.physical_therapy_id = None
+        self.profile_repo.update_profile(profile)

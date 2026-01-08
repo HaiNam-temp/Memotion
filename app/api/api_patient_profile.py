@@ -68,6 +68,25 @@ def update_general_profile(
         logger.error(f"update_general_profile error: {str(e)}", exc_info=True)
         raise CustomException(http_code=400, code='400', message=str(e))
 
+@router.delete('/general', dependencies=[Depends(login_required)], response_model=DataResponse[None])
+def delete_general_profile(
+    profile_service: PatientProfileService = Depends(),
+    current_user: User = Depends(UserService.get_current_user)
+) -> Any:
+    """
+    Delete patient general profile.
+    
+    This API allows patients to delete their own profile or caretakers to delete the profile of their assigned patient.
+    """
+    try:
+        logger.info(f"delete_general_profile request: user_id={current_user.user_id}")
+        profile_service.delete_patient_profile(current_user)
+        logger.info(f"delete_general_profile success: user_id={current_user.user_id}")
+        return DataResponse().success_response(data=None, message="Profile deleted successfully")
+    except Exception as e:
+        logger.error(f"delete_general_profile error: {str(e)}", exc_info=True)
+        raise CustomException(http_code=400, code='400', message=str(e))
+
 @router.post('/physical-therapy', dependencies=[Depends(login_required)], response_model=DataResponse[PhysicalTherapyResponse])
 def create_physical_therapy_profile(
     therapy_data: PhysicalTherapyCreateRequest, 
@@ -112,4 +131,23 @@ def update_physical_therapy_profile(
         therapy = profile_service.update_physical_therapy_profile(therapy_data, current_user)
         return DataResponse().success_response(data=therapy)
     except Exception as e:
+        raise CustomException(http_code=400, code='400', message=str(e))
+
+@router.delete('/physical-therapy', dependencies=[Depends(login_required)], response_model=DataResponse[None])
+def delete_physical_therapy_profile(
+    profile_service: PatientProfileService = Depends(),
+    current_user: User = Depends(UserService.get_current_user)
+) -> Any:
+    """
+    Delete patient physical therapy profile.
+    
+    This API allows patients to delete their own physical therapy profile or caretakers to delete the profile of their assigned patient.
+    """
+    try:
+        logger.info(f"delete_physical_therapy_profile request: user_id={current_user.user_id}")
+        profile_service.delete_physical_therapy_profile(current_user)
+        logger.info(f"delete_physical_therapy_profile success: user_id={current_user.user_id}")
+        return DataResponse().success_response(data=None, message="Physical therapy profile deleted successfully")
+    except Exception as e:
+        logger.error(f"delete_physical_therapy_profile error: {str(e)}", exc_info=True)
         raise CustomException(http_code=400, code='400', message=str(e))

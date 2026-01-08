@@ -22,6 +22,10 @@ class PatientProfileRepository:
         self.db.refresh(profile)
         return profile
 
+    def delete_profile(self, profile: PatientProfile) -> None:
+        self.db.delete(profile)
+        self.db.commit()
+
     def create_physical_therapy(self, therapy_data: PatientPhysicalTherapy) -> PatientPhysicalTherapy:
         self.db.add(therapy_data)
         self.db.commit()
@@ -38,3 +42,7 @@ class PatientProfileRepository:
         self.db.commit()
         self.db.refresh(therapy)
         return therapy
+
+    def delete_physical_therapy(self, therapy: PatientPhysicalTherapy) -> None:
+        self.db.delete(therapy)
+        self.db.commit()
