@@ -19,3 +19,8 @@ class PatientProfile(Base):
     disease_type = Column(String(100), nullable=False)
     condition_note = Column(Text)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # New 1-1 relationship fields
+    physical_therapy_id = Column(UUID(as_uuid=True), unique=True)
+    mental_decline_id = Column(UUID(as_uuid=True), unique=True)
+    loneliness_id = Column(UUID(as_uuid=True), unique=True)

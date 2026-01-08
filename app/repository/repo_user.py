@@ -1,12 +1,11 @@
 from typing import Optional
 from fastapi import Depends
-from sqlalchemy.orm import Session
 from app.db.base import get_db
 from app.models.model_user import User
 from app.models.model_patient_caretaker import PatientCaretaker
 
 class UserRepository:
-    def __init__(self, db_session: Session = Depends(get_db)):
+    def __init__(self, db_session = Depends(get_db)):
         self.db = db_session
 
     def get_all(self):
@@ -44,3 +43,9 @@ class UserRepository:
     def get_patient_id_by_caretaker(self, caretaker_id: str) -> Optional[str]:
         result = self.db.query(PatientCaretaker.patient_id).filter(PatientCaretaker.caretaker_id == caretaker_id).first()
         return result[0] if result else None
+
+    def get_assigned_patient(self, caretaker_id: str) -> Optional[User]:
+        patient_id = self.get_patient_id_by_caretaker(caretaker_id)
+        if patient_id:
+            return self.get_by_id(patient_id)
+        return None

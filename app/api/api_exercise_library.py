@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 from fastapi import APIRouter, Depends
 
 from app.helpers.exception_handler import CustomException
@@ -8,6 +8,16 @@ from app.schemas.sche_exercise_library import ExerciseLibraryCreateRequest, Exer
 from app.services.srv_exercise_library import ExerciseLibraryService
 
 router = APIRouter()
+
+@router.get('', dependencies=[Depends(login_required)], response_model=DataResponse[List[ExerciseLibraryResponse]])
+def get_all_exercises(
+    exercise_service: ExerciseLibraryService = Depends()
+) -> Any:
+    try:
+        exercises = exercise_service.get_all_exercises()
+        return DataResponse().success_response(data=exercises)
+    except Exception as e:
+        raise CustomException(http_code=400, code='400', message=str(e))
 
 @router.post('', dependencies=[Depends(login_required)], response_model=DataResponse[ExerciseLibraryResponse])
 def create_exercise(

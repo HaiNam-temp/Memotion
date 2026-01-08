@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 from fastapi import APIRouter, Depends
 
 from app.helpers.exception_handler import CustomException
@@ -8,6 +8,16 @@ from app.schemas.sche_medication_library import MedicationLibraryCreateRequest, 
 from app.services.srv_medication_library import MedicationLibraryService
 
 router = APIRouter()
+
+@router.get('', dependencies=[Depends(login_required)], response_model=DataResponse[List[MedicationLibraryResponse]])
+def get_all_medications(
+    medication_service: MedicationLibraryService = Depends()
+) -> Any:
+    try:
+        medications = medication_service.get_all_medications()
+        return DataResponse().success_response(data=medications)
+    except Exception as e:
+        raise CustomException(http_code=400, code='400', message=str(e))
 
 @router.post('', dependencies=[Depends(login_required)], response_model=DataResponse[MedicationLibraryResponse])
 def create_medication(

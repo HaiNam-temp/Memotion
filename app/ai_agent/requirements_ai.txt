@@ -1,0 +1,8 @@
+# AI Agent Requirements
+# Additional packages needed for AI Care Plan Agent
+
+# Google Gemini AI
+google-generativeai>=0.3.0
+
+# Optional: For advanced prompt engineering
+langchain>=0.1.0  # Optional, if using LangChain abstractions

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Dict
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,18 +18,16 @@ class LoginRequest(BaseModel):
     password: str = 'secret123'
 
 @router.post('/login', response_model=DataResponse[Token])
-def login_access_token(form_data: LoginRequest, user_service: UserService = Depends()):
+def login_access_token(form_data: LoginRequest, user_service: UserService = Depends()) -> DataResponse[Token]:
     user = user_service.authenticate(email=form_data.username, password=form_data.password)
     if not user:
         raise CustomException(http_code=400, code='400', message='Incorrect email or password')
     elif not user.is_active:
         raise CustomException(http_code=400, code='400', message='Inactive user')
 
-    return DataResponse().success_response({
-        'access_token': create_access_token(user_id=str(user.user_id))
-    })
+    return DataResponse().success_response(data=Token(access_token=create_access_token(user_id=str(user.user_id))))
 
-@router.post('/register', response_model=DataResponse[UserItemResponse])
+@router.post('/register', response_model=DataResponse)
 def register(register_data: UserRegisterRequest, user_service: UserService = Depends()) -> Any:
     try:
         register_user = user_service.register_user(register_data)

@@ -19,8 +19,19 @@ def create_general_profile(
     profile_service: PatientProfileService = Depends(),
     current_user: User = Depends(UserService.get_current_user)
 ) -> Any:
+    """
+    Create patient profile by caretaker.
+    
+    This API is used by caretakers to create profiles for their assigned patients,
+    since patients may have difficulty using mobile devices.
+    
+    Business logic:
+    1. Find the patient assigned to the current caretaker user
+    2. Check if the patient already has a profile (throws exception if exists)
+    3. Create the profile for the assigned patient
+    """
     try:
-        logger.info(f"create_general_profile request: user_id={current_user.user_id}, data={profile_data.dict()}")
+        logger.info(f"create_general_profile request: caretaker_id={current_user.user_id}, data={profile_data.dict()}")
         profile = profile_service.create_patient_profile(profile_data, current_user)
         logger.info(f"create_general_profile success: profile_id={profile.patient_id}")
         return DataResponse().success_response(data=profile)
@@ -63,6 +74,17 @@ def create_physical_therapy_profile(
     profile_service: PatientProfileService = Depends(),
     current_user: User = Depends(UserService.get_current_user)
 ) -> Any:
+    """
+    Create physical therapy profile by caretaker.
+    
+    This API is used by caretakers to create physical therapy profiles for their assigned patients,
+    since patients may have difficulty using mobile devices.
+    
+    Business logic:
+    1. Find the patient assigned to the current caretaker user
+    2. Check if the patient already has a physical therapy profile (throws exception if exists)
+    3. Create the physical therapy profile for the assigned patient
+    """
     try:
         therapy = profile_service.create_physical_therapy_profile(therapy_data, current_user)
         return DataResponse().success_response(data=therapy)

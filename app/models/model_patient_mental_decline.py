@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, Integer, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.model_base import Base
+import uuid
 
 class PatientMentalDecline(Base):
     __tablename__ = "patient_mental_decline"

@@ -2,7 +2,7 @@ from typing import List, Optional
 from datetime import date
 from fastapi import Depends
 from sqlalchemy import cast, Date
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import joinedload
 from app.db.base import get_db
 from app.models.model_task import Task
 from app.models.model_care_plan import CarePlan
@@ -11,8 +11,14 @@ from app.models.model_nutrition_library import NutritionLibrary
 from app.models.model_exercise_library import ExerciseLibrary
 
 class TaskRepository:
-    def __init__(self, db_session: Session = Depends(get_db)):
+    def __init__(self, db_session = Depends(get_db)):
         self.db = db_session
+
+    def create_task(self, task_data: Task) -> Task:
+        self.db.add(task_data)
+        self.db.commit()
+        self.db.refresh(task_data)
+        return task_data
 
     def get_task_by_id(self, task_id: str) -> Optional[Task]:
         return self.db.query(Task).filter(Task.task_id == task_id).first()
@@ -57,3 +63,7 @@ class TaskRepository:
             Task.care_plan_id == care_plan_id,
             Task.owner_type == 'CARETAKER'
         ).all()
+
+    def delete_tasks_by_care_plan_id(self, care_plan_id: str) -> None:
+        self.db.query(Task).filter(Task.care_plan_id == care_plan_id).delete()
+        self.db.commit()
