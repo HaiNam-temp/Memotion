@@ -1,4 +1,5 @@
 import logging
+import os
 
 import uvicorn
 from fastapi import FastAPI
@@ -46,6 +47,7 @@ def get_application() -> FastAPI:
     application.include_router(router, prefix=settings.API_PREFIX)
     application.add_exception_handler(CustomException, http_exception_handler)
     
+    os.makedirs("static", exist_ok=True)
     application.mount("/static", StaticFiles(directory="static"), name="static")
 
     for route in application.routes:
