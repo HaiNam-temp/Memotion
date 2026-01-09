@@ -63,7 +63,7 @@ def create_medication(
     try:
         logger.info(f"create_medication request: {medication_data.name}")
         medication = medication_service.create_medication(medication_data)
-        logger.info(f"create_medication success: medication_id={medication.id}")
+        logger.info(f"create_medication success: medication_id={medication.medication_id}")
         return DataResponse().success_response(data=medication)
     except Exception as e:
         logger.error(f"create_medication error: {str(e)}", exc_info=True)

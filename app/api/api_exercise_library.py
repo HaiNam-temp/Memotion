@@ -63,7 +63,7 @@ def create_exercise(
     try:
         logger.info(f"create_exercise request: {exercise_data.name}")
         exercise = exercise_service.create_exercise(exercise_data)
-        logger.info(f"create_exercise success: exercise_id={exercise.id}")
+        logger.info(f"create_exercise success: exercise_id={exercise.exercise_id}")
         return DataResponse().success_response(data=exercise)
     except Exception as e:
         logger.error(f"create_exercise error: {str(e)}", exc_info=True)

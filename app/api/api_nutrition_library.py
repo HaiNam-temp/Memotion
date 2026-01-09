@@ -63,7 +63,7 @@ def create_nutrition(
     try:
         logger.info(f"create_nutrition request: {nutrition_data.name}")
         nutrition = nutrition_service.create_nutrition(nutrition_data)
-        logger.info(f"create_nutrition success: nutrition_id={nutrition.id}")
+        logger.info(f"create_nutrition success: nutrition_id={nutrition.nutrition_id}")
         return DataResponse().success_response(data=nutrition)
     except Exception as e:
         logger.error(f"create_nutrition error: {str(e)}", exc_info=True)
