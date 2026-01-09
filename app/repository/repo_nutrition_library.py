@@ -20,3 +20,11 @@ class NutritionLibraryRepository:
 
     def get_all(self, limit: int = 50) -> List[NutritionLibrary]:
         return self.db.query(NutritionLibrary).limit(limit).all()
+
+    def delete(self, nutrition_id: str) -> bool:
+        nutrition = self.db.query(NutritionLibrary).filter(NutritionLibrary.nutrition_id == nutrition_id).first()
+        if nutrition:
+            self.db.delete(nutrition)
+            self.db.commit()
+            return True
+        return False

@@ -68,3 +68,38 @@ def create_nutrition(
     except Exception as e:
         logger.error(f"create_nutrition error: {str(e)}", exc_info=True)
         raise CustomException(http_code=400, code='400', message=str(e))
+
+@router.delete('/{nutrition_id}', dependencies=[Depends(login_required)], response_model=DataResponse[bool])
+def delete_nutrition(
+    nutrition_id: str,
+    nutrition_service: NutritionLibraryService = Depends()
+) -> Any:
+    """
+    Delete a nutrition item from the nutrition library.
+    
+    This API allows removing nutrition items from the system library. The nutrition item will no longer 
+    be available for use in care plans.
+    
+    **Authorization**: Authenticated user required.
+    
+    **Process**:
+    1. Validate nutrition item exists
+    2. Delete nutrition record from database
+    3. Return deletion status
+    
+    **Response**: Boolean indicating success of deletion.
+    """
+    try:
+        logger.info(f"delete_nutrition request: nutrition_id={nutrition_id}")
+        success = nutrition_service.delete_nutrition(nutrition_id)
+        if success:
+            logger.info(f"delete_nutrition success: nutrition_id={nutrition_id}")
+            return DataResponse().success_response(data=True)
+        else:
+            logger.warning(f"delete_nutrition not found: nutrition_id={nutrition_id}")
+            raise CustomException(http_code=404, code='404', message="Nutrition item not found")
+    except CustomException:
+        raise
+    except Exception as e:
+        logger.error(f"delete_nutrition error: {str(e)}", exc_info=True)
+        raise CustomException(http_code=400, code='400', message=str(e))

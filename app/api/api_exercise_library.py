@@ -68,3 +68,38 @@ def create_exercise(
     except Exception as e:
         logger.error(f"create_exercise error: {str(e)}", exc_info=True)
         raise CustomException(http_code=400, code='400', message=str(e))
+
+@router.delete('/{exercise_id}', dependencies=[Depends(login_required)], response_model=DataResponse[bool])
+def delete_exercise(
+    exercise_id: str,
+    exercise_service: ExerciseLibraryService = Depends()
+) -> Any:
+    """
+    Delete an exercise from the exercise library.
+    
+    This API allows removing exercises from the system library. The exercise will no longer 
+    be available for use in care plans.
+    
+    **Authorization**: Authenticated user required.
+    
+    **Process**:
+    1. Validate exercise exists
+    2. Delete exercise record from database
+    3. Return deletion status
+    
+    **Response**: Boolean indicating success of deletion.
+    """
+    try:
+        logger.info(f"delete_exercise request: exercise_id={exercise_id}")
+        success = exercise_service.delete_exercise(exercise_id)
+        if success:
+            logger.info(f"delete_exercise success: exercise_id={exercise_id}")
+            return DataResponse().success_response(data=True)
+        else:
+            logger.warning(f"delete_exercise not found: exercise_id={exercise_id}")
+            raise CustomException(http_code=404, code='404', message="Exercise not found")
+    except CustomException:
+        raise
+    except Exception as e:
+        logger.error(f"delete_exercise error: {str(e)}", exc_info=True)
+        raise CustomException(http_code=400, code='400', message=str(e))

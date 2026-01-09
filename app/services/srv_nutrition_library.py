@@ -14,3 +14,6 @@ class NutritionLibraryService:
     def get_all_nutritions(self, limit: int = 50) -> List[NutritionLibraryResponse]:
         nutritions = self.nutrition_repo.get_all(limit=limit)
         return [NutritionLibraryResponse.from_orm(n) for n in nutritions]
+
+    def delete_nutrition(self, nutrition_id: str) -> bool:
+        return self.nutrition_repo.delete(nutrition_id)

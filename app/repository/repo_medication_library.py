@@ -20,3 +20,11 @@ class MedicationLibraryRepository:
 
     def get_all(self, limit: int = 50) -> List[MedicationLibrary]:
         return self.db.query(MedicationLibrary).limit(limit).all()
+
+    def delete(self, medication_id: str) -> bool:
+        medication = self.db.query(MedicationLibrary).filter(MedicationLibrary.medication_id == medication_id).first()
+        if medication:
+            self.db.delete(medication)
+            self.db.commit()
+            return True
+        return False

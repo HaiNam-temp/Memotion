@@ -68,3 +68,38 @@ def create_medication(
     except Exception as e:
         logger.error(f"create_medication error: {str(e)}", exc_info=True)
         raise CustomException(http_code=400, code='400', message=str(e))
+
+@router.delete('/{medication_id}', dependencies=[Depends(login_required)], response_model=DataResponse[bool])
+def delete_medication(
+    medication_id: str,
+    medication_service: MedicationLibraryService = Depends()
+) -> Any:
+    """
+    Delete a medication from the medication library.
+    
+    This API allows removing medications from the system library. The medication will no longer 
+    be available for use in care plans.
+    
+    **Authorization**: Authenticated user required.
+    
+    **Process**:
+    1. Validate medication exists
+    2. Delete medication record from database
+    3. Return deletion status
+    
+    **Response**: Boolean indicating success of deletion.
+    """
+    try:
+        logger.info(f"delete_medication request: medication_id={medication_id}")
+        success = medication_service.delete_medication(medication_id)
+        if success:
+            logger.info(f"delete_medication success: medication_id={medication_id}")
+            return DataResponse().success_response(data=True)
+        else:
+            logger.warning(f"delete_medication not found: medication_id={medication_id}")
+            raise CustomException(http_code=404, code='404', message="Medication not found")
+    except CustomException:
+        raise
+    except Exception as e:
+        logger.error(f"delete_medication error: {str(e)}", exc_info=True)
+        raise CustomException(http_code=400, code='400', message=str(e))

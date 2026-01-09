@@ -14,3 +14,6 @@ class MedicationLibraryService:
     def get_all_medications(self, limit: int = 50) -> List[MedicationLibraryResponse]:
         medications = self.medication_repo.get_all(limit=limit)
         return [MedicationLibraryResponse.from_orm(m) for m in medications]
+
+    def delete_medication(self, medication_id: str) -> bool:
+        return self.medication_repo.delete(medication_id)

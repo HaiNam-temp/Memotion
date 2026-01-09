@@ -20,3 +20,11 @@ class ExerciseLibraryRepository:
 
     def get_all(self, limit: int = 50) -> List[ExerciseLibrary]:
         return self.db.query(ExerciseLibrary).limit(limit).all()
+
+    def delete(self, exercise_id: str) -> bool:
+        exercise = self.db.query(ExerciseLibrary).filter(ExerciseLibrary.exercise_id == exercise_id).first()
+        if exercise:
+            self.db.delete(exercise)
+            self.db.commit()
+            return True
+        return False

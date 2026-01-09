@@ -14,3 +14,6 @@ class ExerciseLibraryService:
     def get_all_exercises(self, limit: int = 50) -> List[ExerciseLibraryResponse]:
         exercises = self.exercise_repo.get_all(limit=limit)
         return [ExerciseLibraryResponse.from_orm(e) for e in exercises]
+
+    def delete_exercise(self, exercise_id: str) -> bool:
+        return self.exercise_repo.delete(exercise_id)
