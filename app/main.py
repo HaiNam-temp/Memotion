@@ -51,7 +51,8 @@ def get_application() -> FastAPI:
     application.mount("/static", StaticFiles(directory="static"), name="static")
 
     for route in application.routes:
-        print(f"Route: {route.path} {route.methods}")
+        methods = getattr(route, 'methods', None)
+        print(f"Route: {route.path} {methods}")
 
     return application
 
