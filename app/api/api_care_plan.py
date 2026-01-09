@@ -11,6 +11,15 @@ from app.services.srv_care_plan import CarePlanService
 from app.services.srv_user import UserService
 from app.models.model_user import User
 from app.schemas.sche_base import DataResponse
+from app.schemas.sche_care_plan import (
+    CarePlanGenerationRequest,
+    CarePlanGenerationResponse,
+    CarePlanUpdateResponse,
+    CarePlanSummaryResponse,
+    TaskRefinementRequest,
+    TaskRefinementResponse,
+    CarePlanDeletionResponse
+)
 from app.helpers.login_manager import login_required
 from app.helpers.exception_handler import CustomException
 
@@ -19,23 +28,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-class GenerateCarePlanRequest(BaseModel):
-    """Request schema for generating care plan."""
-    plan_duration_days: int = Field(default=7, ge=1, le=30, description="Duration of care plan in days")
-    regenerate: bool = Field(default=False, description="Whether to regenerate existing plan")
-
-
-class RefineTaskRequest(BaseModel):
-    """Request schema for refining task with AI."""
-    patient_feedback: str = Field(..., min_length=10, description="Patient feedback about the task")
-
-
-@router.post('/generate', response_model=DataResponse[Dict[str, Any]])
+@router.post('/generate', response_model=DataResponse[CarePlanGenerationResponse])
 def generate_care_plan(
-    request: GenerateCarePlanRequest,
+    request: CarePlanGenerationRequest,
     care_plan_service: CarePlanService = Depends(),
     current_user: User = Depends(login_required)
-) -> DataResponse[Dict[str, Any]]:
+) -> DataResponse[CarePlanGenerationResponse]:
     """
     Generate AI-powered care plan for patient.
     
@@ -77,12 +75,12 @@ class UpdateCarePlanRequest(BaseModel):
     plan_duration_days: int = Field(default=7, ge=1, le=30, description="Duration of updated care plan in days")
 
 
-@router.post('/update', response_model=DataResponse[Dict[str, Any]])
+@router.post('/update', response_model=DataResponse[CarePlanUpdateResponse])
 def update_care_plan(
-    request: Optional[UpdateCarePlanRequest] = None,
+    request: Optional[CarePlanGenerationRequest] = None,
     care_plan_service: CarePlanService = Depends(),
     current_user: User = Depends(login_required)
-) -> DataResponse[Dict[str, Any]]:
+) -> DataResponse[CarePlanUpdateResponse]:
     """
     Update existing care plan with new tasks based on current patient profile.
     
@@ -121,11 +119,11 @@ def update_care_plan(
         )
 
 
-@router.get('/summary', response_model=DataResponse[Dict[str, Any]])
+@router.get('/summary', response_model=DataResponse[CarePlanSummaryResponse])
 def get_care_plan_summary(
     care_plan_service: CarePlanService = Depends(),
     current_user: User = Depends(login_required)
-) -> DataResponse[Dict[str, Any]]:
+) -> DataResponse[CarePlanSummaryResponse]:
     """
     Get care plan summary for current user.
     
@@ -177,13 +175,13 @@ def get_care_plan_summary(
         )
 
 
-@router.post('/tasks/{task_id}/refine', response_model=DataResponse[Dict[str, Any]])
+@router.post('/tasks/{task_id}/refine', response_model=DataResponse[TaskRefinementResponse])
 def refine_task(
     task_id: str,
-    request: RefineTaskRequest,
+    request: TaskRefinementRequest,
     care_plan_service: CarePlanService = Depends(),
     current_user: User = Depends(login_required)
-) -> DataResponse[Dict[str, Any]]:
+) -> DataResponse[TaskRefinementResponse]:
     """
     Refine a specific task using AI based on patient feedback.
     

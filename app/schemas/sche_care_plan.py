@@ -21,6 +21,7 @@ class CarePlanGenerationRequest(BaseModel):
     )
     
     class Config:
+        extra = "ignore"  # Allow extra fields to be ignored
         json_schema_extra = {
             "example": {
                 "plan_duration_days": 7,
@@ -81,6 +82,36 @@ class CarePlanSummaryResponse(BaseModel):
         }
 
 
+class CarePlanUpdateResponse(BaseModel):
+    """Response after successful care plan update."""
+    care_plan_id: str = Field(..., description="Updated care plan UUID")
+    patient_id: str = Field(..., description="Patient UUID")
+    caretaker_id: str = Field(..., description="Caretaker UUID")
+    plan_duration_days: int = Field(..., description="Plan duration in days")
+    total_tasks: int = Field(..., description="Total tasks after update")
+    tasks_updated: int = Field(..., description="Tasks updated")
+    recommendations: List[str] = Field(default_factory=list, description="AI recommendations")
+    updated_at: str = Field(..., description="Update timestamp")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "care_plan_id": "123e4567-e89b-12d3-a456-426614174000",
+                "patient_id": "123e4567-e89b-12d3-a456-426614174001",
+                "caretaker_id": "123e4567-e89b-12d3-a456-426614174002",
+                "plan_duration_days": 7,
+                "total_tasks": 28,
+                "tasks_updated": 28,
+                "recommendations": [
+                    "Monitor pain levels daily",
+                    "Encourage hydration",
+                    "Schedule physical therapy follow-up"
+                ],
+                "updated_at": "2026-01-07T10:30:00"
+            }
+        }
+
+
 class CarePlanGenerationResponse(BaseModel):
     """Response after successful care plan generation."""
     care_plan_id: str = Field(..., description="Created care plan UUID")
@@ -111,6 +142,20 @@ class CarePlanGenerationResponse(BaseModel):
         }
 
 
+class CarePlanDeletionResponse(BaseModel):
+    """Response after successful care plan deletion."""
+    message: str = Field(..., description="Success message")
+    patient_id: str = Field(..., description="Patient UUID")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "message": "Care plan deleted successfully",
+                "patient_id": "123e4567-e89b-12d3-a456-426614174001"
+            }
+        }
+
+
 class TaskRefinementRequest(BaseModel):
     """Request to refine a task using AI."""
     patient_feedback: str = Field(
@@ -121,6 +166,7 @@ class TaskRefinementRequest(BaseModel):
     )
     
     class Config:
+        extra = "ignore"  # Allow extra fields to be ignored
         json_schema_extra = {
             "example": {
                 "patient_feedback": "This exercise is too difficult for me. Can we have something gentler for my knees?"
