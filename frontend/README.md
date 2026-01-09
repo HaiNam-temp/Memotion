@@ -1,12 +1,30 @@
-# Getting Started with Create React App
+# Frontend Package for Library Management
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This is a React frontend package to add and view data from the medication_library, nutrition_library, and exercise_library tables via the API.
 
-## Available Scripts
+## Setup
 
-In the project directory, you can run:
+1. Install dependencies: `npm install`
 
-### `npm start`
+2. Create `.env` file with `REACT_APP_API_BASE=http://your-api-url/api`
+
+3. Start development server: `npm start`
+
+4. Build for production: `npm run build`
+
+## Docker
+
+Build image: `docker build -t frontend .`
+
+Run container: `docker run -p 3000:80 frontend`
+
+## Usage
+
+- Login with credentials.
+- Add data using forms with file upload.
+- View data in grid layout with media previews.
+
+Note: Assumes backend API supports the endpoints.
 
 Runs the app in the development mode.\
 Open [http://localhost:3000](http://localhost:3000) to view it in your browser.

@@ -1,12 +1,15 @@
 import os
 import shutil
 import json
+import logging
 from typing import Any
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
 from app.core.config import settings, BASE_DIR
 from app.schemas.sche_base import DataResponse
 from app.helpers.exception_handler import CustomException
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -31,9 +34,12 @@ def load_counter():
     return {"nutri": 0, "exer": 0, "medical": 0}
 
 def save_counter(counter):
-    counter_file = os.path.join(BASE_DIR, 'counter.json')
-    with open(counter_file, 'w') as f:
-        json.dump(counter, f)
+    try:
+        counter_file = os.path.join(BASE_DIR, 'counter.json')
+        with open(counter_file, 'w') as f:
+            json.dump(counter, f)
+    except Exception as e:
+        logger.error(f"Failed to save counter: {e}")
 
 @router.post("", response_model=DataResponse[str])
 async def upload_file(file: UploadFile = File(...), type: str = Form(...)) -> Any:
