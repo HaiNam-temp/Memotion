@@ -80,7 +80,45 @@ class TaskService:
             
         return response_list
 
-    def get_caretaker_tasks(self, current_user: User) -> List[TaskResponse]:
+    def get_patient_nutrition_tasks_by_date(self, task_date: date, current_user: User) -> List[TaskDetailResponse]:
+        care_plan = self.task_repo.get_care_plan_by_patient_id(current_user.user_id)
+        if not care_plan:
+            raise Exception("Care plan not found for this patient.")
+
+        tasks = self.task_repo.get_nutrition_tasks_by_date(
+            care_plan_id=care_plan.care_plan_id,
+            task_date=task_date,
+            owner_type=UserRole.PATIENT.value
+        )
+        
+        response_list = []
+        for task in tasks:
+            task_resp = TaskDetailResponse.from_orm(task)
+            if task.nutrition:
+                task_resp.nutrition_detail = NutritionDetail.from_orm(task.nutrition)
+            response_list.append(task_resp)
+            
+        return response_list
+
+    def get_patient_exercise_tasks_by_date(self, task_date: date, current_user: User) -> List[TaskDetailResponse]:
+        care_plan = self.task_repo.get_care_plan_by_patient_id(current_user.user_id)
+        if not care_plan:
+            raise Exception("Care plan not found for this patient.")
+
+        tasks = self.task_repo.get_exercise_tasks_by_date(
+            care_plan_id=care_plan.care_plan_id,
+            task_date=task_date,
+            owner_type=UserRole.PATIENT.value
+        )
+        
+        response_list = []
+        for task in tasks:
+            task_resp = TaskDetailResponse.from_orm(task)
+            if task.exercise:
+                task_resp.exercise_detail = ExerciseDetail.from_orm(task.exercise)
+            response_list.append(task_resp)
+            
+        return response_list
         if current_user.role != UserRole.CARETAKER.value:
             raise Exception("Access denied. Only caretakers can access this.")
 

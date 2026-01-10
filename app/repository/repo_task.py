@@ -55,7 +55,21 @@ class TaskRepository:
             Task.task_type == 'MEDICATION'
         ).all()
 
-    def get_tasks_by_care_plan(self, care_plan_id: str) -> List[Task]:
+    def get_nutrition_tasks_by_date(self, care_plan_id: str, task_date: date, owner_type: str) -> List[Task]:
+        return self.db.query(Task).join(NutritionLibrary, Task.nutrition_id == NutritionLibrary.nutrition_id).filter(
+            Task.care_plan_id == care_plan_id,
+            cast(Task.task_duedate, Date) == task_date,
+            Task.owner_type == owner_type,
+            Task.task_type == 'NUTRITION'
+        ).all()
+
+    def get_exercise_tasks_by_date(self, care_plan_id: str, task_date: date, owner_type: str) -> List[Task]:
+        return self.db.query(Task).join(ExerciseLibrary, Task.exercise_id == ExerciseLibrary.exercise_id).filter(
+            Task.care_plan_id == care_plan_id,
+            cast(Task.task_duedate, Date) == task_date,
+            Task.owner_type == owner_type,
+            Task.task_type == 'EXERCISE'
+        ).all()
         return self.db.query(Task).filter(Task.care_plan_id == care_plan_id).all()
 
     def get_caretaker_tasks(self, care_plan_id: str) -> List[Task]:
