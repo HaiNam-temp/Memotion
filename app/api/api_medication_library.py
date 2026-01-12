@@ -1,11 +1,12 @@
 from typing import Any, List
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File
 import logging
+import os
 
 from app.helpers.exception_handler import CustomException
 from app.helpers.login_manager import login_required
 from app.schemas.sche_base import DataResponse
-from app.schemas.sche_medication_library import MedicationLibraryCreateRequest, MedicationLibraryResponse
+from app.schemas.sche_medication_library import MedicationLibraryCreateRequest, MedicationLibraryResponse, MedicationScanResponse
 from app.services.srv_medication_library import MedicationLibraryService
 
 router = APIRouter()
@@ -68,6 +69,76 @@ def create_medication(
     except Exception as e:
         logger.error(f"create_medication error: {str(e)}", exc_info=True)
         raise CustomException(http_code=400, code='400', message=str(e))
+
+@router.post('/scan-image', dependencies=[Depends(login_required)], response_model=DataResponse[MedicationScanResponse])
+async def scan_medication_image(
+    file: UploadFile = File(...),
+    medication_service: MedicationLibraryService = Depends()
+) -> Any:
+    """
+    Scan medication image to identify and extract medication information.
+    
+    This API allows users to upload an image of medication packaging or pills to automatically 
+    identify the medication and add it to the library if not already present.
+    
+    **Authorization**: Authenticated user required.
+    
+    **Process**:
+    1. Receive and validate uploaded image
+    2. Use AI agent to scan and analyze the medication image
+    3. Check if medication already exists in library by name
+    4. If exists, return existing medication data
+    5. If not exists, create new medication record and upload image
+    6. Return medication information
+    
+    **Supported file types**: PNG, JPG, JPEG, GIF, WebP
+    
+    **Response**: MedicationScanResponse with medication details or error message if medication not found.
+    """
+    try:
+        logger.info(f"scan_medication_image request: filename={file.filename}")
+
+        # Validate file type
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+        file_extension = file.filename.split('.')[-1].lower()
+        if file_extension not in allowed_extensions:
+            raise CustomException(http_code=400, code='400', message="Invalid file type. Only image files are allowed.")
+
+        # Save uploaded file temporarily
+        temp_dir = os.path.join(os.getcwd(), 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_file_path = os.path.join(temp_dir, f"temp_{file.filename}")
+        
+        with open(temp_file_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+
+        try:
+            # Process the image
+            result = medication_service.scan_and_process_medication_image(temp_file_path)
+            
+            logger.info(f"scan_medication_image success: medication processed")
+            return DataResponse().success_response(data=MedicationScanResponse(medication=result))
+                
+        except CustomException as e:
+            if "AI Agent" in str(e.message):
+                # Agent error
+                logger.error(f"scan_medication_image agent error: {str(e.message)}")
+                return DataResponse().success_response(data=MedicationScanResponse(agent_error=str(e.message)))
+            else:
+                # Not found error
+                logger.info(f"scan_medication_image: medication not found")
+                return DataResponse().success_response(data=MedicationScanResponse(message="Thuốc Not found"))
+        finally:
+            # Clean up temp file
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    except CustomException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"scan_medication_image error: {str(e)}", exc_info=True)
+        raise CustomException(http_code=500, code='500', message=str(e))
 
 @router.delete('/{medication_id}', dependencies=[Depends(login_required)], response_model=DataResponse[bool])
 def delete_medication(

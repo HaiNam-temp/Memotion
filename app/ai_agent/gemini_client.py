@@ -308,3 +308,150 @@ class GeminiClient:
         except Exception as e:
             logger.error(f"Chat error: {str(e)}", exc_info=True)
             raise Exception(f"Failed to chat with Gemini: {str(e)}")
+
+    def generate_content_with_image(
+        self,
+        prompt: str,
+        image_path: str,
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+        top_p: float = 0.95,
+        top_k: int = 40
+    ) -> str:
+        """
+        Generate content using Gemini API with image input.
+
+        Args:
+            prompt: Input prompt text.
+            image_path: Path to the image file.
+            temperature: Sampling temperature (0.0-1.0). Higher = more creative.
+            max_tokens: Maximum tokens in response.
+            top_p: Nucleus sampling parameter.
+            top_k: Top-k sampling parameter.
+
+        Returns:
+            Generated text response.
+
+        Raises:
+            Exception: If API call fails.
+        """
+        try:
+            import PIL.Image
+
+            # Load image
+            image = PIL.Image.open(image_path)
+
+            generation_config = genai.types.GenerationConfig(
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                max_output_tokens=max_tokens,
+            )
+
+            logger.info(f"Generating content with image using Gemini (temp={temperature}, model={self.model_name})")
+            response = self.model.generate_content(
+                [prompt, image],
+                generation_config=generation_config
+            )
+
+            if not response.text:
+                logger.error("Gemini returned empty response for image")
+                raise Exception("Empty response from Gemini API")
+
+            logger.info(f"Successfully generated content with image ({len(response.text)} chars)")
+            return response.text
+
+        except Exception as e:
+            logger.error(f"Gemini API error with image: {str(e)}", exc_info=True)
+            raise Exception(f"Failed to generate content with image: {str(e)}")
+
+    def generate_json_content_with_image(
+        self,
+        prompt: str,
+        image_path: str,
+        temperature: float = 0.3,
+        max_tokens: Optional[int] = 4096
+    ) -> Dict[str, Any]:
+        """
+        Generate structured JSON content using Gemini API with image input.
+        Uses lower temperature for more consistent output.
+
+        Args:
+            prompt: Input prompt requesting JSON output.
+            image_path: Path to the image file.
+            temperature: Sampling temperature (default: 0.3 for structured output).
+            max_tokens: Maximum tokens in response.
+
+        Returns:
+            Parsed JSON dictionary.
+
+        Raises:
+            Exception: If API call fails or response is not valid JSON.
+        """
+        import json
+
+        try:
+            # Add JSON instruction to prompt if not already present
+            if "json" not in prompt.lower():
+                prompt = f"{prompt}\n\nRespond with valid JSON only."
+
+            response_text = self.generate_content_with_image(
+                prompt=prompt,
+                image_path=image_path,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+
+            # Try to extract JSON from code blocks if present
+            original_response = response_text
+            extracted_json = None
+            
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                extracted_json = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                extracted_json = response_text[json_start:json_end].strip()
+            else:
+                # No code blocks, assume whole response is JSON
+                extracted_json = response_text.strip()
+
+            # Clean the JSON string to remove any trailing text
+            extracted_json = self._clean_json_string(extracted_json)
+
+            # Log the extracted JSON for debugging
+            logger.info(f"Extracted JSON from AI image response: {extracted_json[:500]}...")
+
+            # Try parsing extracted JSON first
+            try:
+                parsed_json = json.loads(extracted_json)
+                logger.info("Successfully parsed JSON response from Gemini with image")
+                return parsed_json
+            except json.JSONDecodeError as e1:
+                logger.warning(f"Failed to parse extracted JSON from image: {str(e1)}")
+                # Try to fix common JSON issues
+                fixed_json = self._fix_malformed_json(extracted_json)
+                if fixed_json != extracted_json:
+                    try:
+                        parsed_json = json.loads(fixed_json)
+                        logger.info("Successfully parsed fixed JSON response from Gemini with image")
+                        return parsed_json
+                    except json.JSONDecodeError as e2:
+                        logger.warning(f"Fixed JSON also failed: {str(e2)}")
+                
+                # Fallback: try parsing the original response
+                logger.warning("Failed to parse extracted JSON, trying original response")
+                cleaned_original = self._clean_json_string(original_response)
+                parsed_json = json.loads(cleaned_original)
+                logger.info("Successfully parsed JSON from original image response")
+                return parsed_json
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON from Gemini image response: {str(e)}")
+            logger.error(f"Extracted JSON text: {extracted_json}")
+            raise Exception(f"Invalid JSON response from Gemini with image: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error generating JSON content with image: {str(e)}", exc_info=True)
+            raise

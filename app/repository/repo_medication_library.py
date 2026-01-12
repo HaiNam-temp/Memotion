@@ -1,4 +1,5 @@
 from typing import Optional, List
+from sqlalchemy import or_
 from fastapi import Depends
 from app.db.base import get_db
 from app.models.model_medication_library import MedicationLibrary
@@ -17,6 +18,14 @@ class MedicationLibraryRepository:
 
     def get_by_id(self, medication_id: str) -> Optional[MedicationLibrary]:
         return self.db.query(MedicationLibrary).filter(MedicationLibrary.medication_id == medication_id).first()
+
+    def get_by_name_like(self, name: str) -> Optional[MedicationLibrary]:
+        return self.db.query(MedicationLibrary).filter(
+            or_(
+                MedicationLibrary.name.ilike(f"%{name}%"),
+                MedicationLibrary.name.ilike(f"%{name.split()[0]}%") if name.split() else False
+            )
+        ).first()
 
     def get_all(self, limit: int = 50) -> List[MedicationLibrary]:
         return self.db.query(MedicationLibrary).limit(limit).all()

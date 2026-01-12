@@ -18,3 +18,8 @@ class MedicationLibraryResponse(MedicationLibraryBase):
 
     class Config:
         orm_mode = True
+
+class MedicationScanResponse(BaseModel):
+    message: Optional[str] = None
+    medication: Optional[MedicationLibraryResponse] = None
+    agent_error: Optional[str] = None
