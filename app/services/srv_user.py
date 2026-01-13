@@ -132,7 +132,7 @@ class UserService:
             hashed_password=hashed_password,
             phone=data.phone,
             is_active=True,
-            role="PATIENT",  # Default role to PATIENT
+            role="CARETAKER",  # Default role to CARETAKER
         )
         created_user = self.user_repo.create(new_user)
         return created_user
