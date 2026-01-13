@@ -48,6 +48,11 @@ class UserRegisterRequest(BaseModel):
     full_name: str
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=72)
+
+
+class CreatePatientByCaretakerRequest(BaseModel):
+    full_name: str = Field(..., description="Patient's full name (username)")
+    email: EmailStr = Field(..., description="Patient's email address")
     phone: Optional[str] = None
     role: UserRole = UserRole.PATIENT
     

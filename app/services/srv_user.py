@@ -11,7 +11,7 @@ from app.models.model_user import User
 from app.core.config import settings
 from app.core.security import verify_password, get_password_hash
 from app.schemas.sche_token import TokenPayload
-from app.schemas.sche_user import UserCreateRequest, UserUpdateMeRequest, UserRegisterRequest, UserRegisterV2Request, UserUpdateRoleRequest
+from app.schemas.sche_user import UserCreateRequest, UserUpdateMeRequest, UserRegisterRequest, UserRegisterV2Request, UserUpdateRoleRequest, CreatePatientByCaretakerRequest
 from app.repository.repo_user import UserRepository
 from app.helpers.enums import UserRole
 
@@ -170,4 +170,40 @@ class UserService:
         
         logger.info(f"User role updated: {user_id} from {UserRole.PATIENT.value} to {UserRole.CARETAKER.value}")
         return updated_user
+
+    def create_patient_by_caretaker(self, data: CreatePatientByCaretakerRequest, current_user: User):
+        """
+        Create a new patient account by a caretaker.
+        The patient will share the same password as the caretaker and be linked to them.
+        """
+        # Validate that current user is a caretaker
+        if current_user.role != UserRole.CARETAKER.value:
+            raise CustomException(http_code=403, code='403', message="Only caretakers can create patient accounts")
+        
+        # Check if patient email already exists
+        if self.user_repo.get_by_email(data.email):
+            raise CustomException(http_code=400, code='400', message="Patient email already exists")
+        
+        # Create patient with caretaker's password
+        hashed_password = current_user.hashed_password  # Use caretaker's password
+        
+        new_patient = User(
+            full_name=data.full_name,
+            email=data.email,
+            hashed_password=hashed_password,
+            phone=None,  # No phone for patients created by caretakers
+            is_active=True,
+            role=UserRole.PATIENT.value,
+        )
+        
+        created_patient = self.user_repo.create(new_patient)
+        
+        # Create relationship between caretaker and patient
+        self.user_repo.create_patient_caretaker(
+            patient_id=created_patient.user_id,
+            caretaker_id=current_user.user_id
+        )
+        
+        logger.info(f"Patient created by caretaker: patient_id={created_patient.user_id}, caretaker_id={current_user.user_id}")
+        return created_patient
 

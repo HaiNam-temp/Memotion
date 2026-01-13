@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.helpers.exception_handler import CustomException
 from app.helpers.login_manager import login_required
 from app.schemas.sche_base import DataResponse
-from app.schemas.sche_user import UserItemResponse, UserUpdateMeRequest
+from app.schemas.sche_user import UserItemResponse, UserUpdateMeRequest, CreatePatientByCaretakerRequest
 from app.services.srv_user import UserService
 from app.models.model_user import User
 
@@ -94,4 +94,45 @@ def update_user_role(current_user: User = Depends(UserService.get_current_user),
         raise
     except Exception as e:
         logger.error(f"update_user_role error: {str(e)}", exc_info=True)
+        raise CustomException(http_code=500, code='500', message=str(e))
+
+
+@router.post("/patients/create-by-caretaker", dependencies=[Depends(login_required)], response_model=DataResponse[UserItemResponse])
+def create_patient_by_caretaker(
+    patient_data: CreatePatientByCaretakerRequest,
+    current_user: User = Depends(UserService.get_current_user),
+    user_service: UserService = Depends()
+) -> Any:
+    """
+    API for caretakers to create patient accounts.
+    
+    This API allows authenticated caretakers to create new patient accounts.
+    The patient will share the same password as the caretaker and be automatically
+    linked to them in a 1-1 relationship.
+    
+    **Authorization**: Authenticated caretaker required.
+    
+    **Process**:
+    1. Validate caretaker authentication
+    2. Check patient email uniqueness
+    3. Create patient account with caretaker's password
+    4. Establish caretaker-patient relationship
+    5. Return created patient information
+    
+    **Request Body**:
+    - full_name: Patient's full name (required)
+    - email: Patient's email address (required, unique)
+    
+    **Response**: Created patient information.
+    """
+    try:
+        created_patient = user_service.create_patient_by_caretaker(
+            data=patient_data,
+            current_user=current_user
+        )
+        return DataResponse().success_response(data=created_patient)
+    except CustomException:
+        raise
+    except Exception as e:
+        logger.error(f"create_patient_by_caretaker error: {str(e)}", exc_info=True)
         raise CustomException(http_code=500, code='500', message=str(e))
