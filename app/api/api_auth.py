@@ -8,7 +8,7 @@ from app.core.security import create_access_token
 from app.helpers.exception_handler import CustomException
 from app.schemas.sche_base import DataResponse
 from app.schemas.sche_token import Token
-from app.schemas.sche_user import UserItemResponse, UserRegisterRequest
+from app.schemas.sche_user import UserItemResponse, UserRegisterRequest, UserRegisterV2Request
 from app.services.srv_user import UserService
 
 router = APIRouter()
@@ -31,6 +31,34 @@ def login_access_token(form_data: LoginRequest, user_service: UserService = Depe
 def register(register_data: UserRegisterRequest, user_service: UserService = Depends()) -> Any:
     try:
         register_user = user_service.register_user(register_data)
+        return DataResponse().success_response(data=register_user)
+    except Exception as e:
+        raise CustomException(http_code=400, code='400', message=str(e))
+
+@router.post('/register/v2', response_model=DataResponse)
+def register_v2(register_data: UserRegisterV2Request, user_service: UserService = Depends()) -> Any:
+    """
+    Register a new user (Version 2) - Simplified registration.
+    
+    This API allows simplified user registration with basic information.
+    Creates a user account with no initial role assigned.
+    User must update their role separately using the update role API.
+    
+    **Process**:
+    1. Validate email and phone uniqueness
+    2. Hash password and create user account with null role
+    3. Return user information
+    
+    **Request Body**:
+    - full_name: User's full name (required)
+    - email: User's email address (required, unique)
+    - password: User's password (required, min 6 characters)
+    - phone: User's phone number (optional, unique if provided)
+    
+    **Response**: User registration information with null role.
+    """
+    try:
+        register_user = user_service.register_user_v2(register_data)
         return DataResponse().success_response(data=register_user)
     except Exception as e:
         raise CustomException(http_code=400, code='400', message=str(e))

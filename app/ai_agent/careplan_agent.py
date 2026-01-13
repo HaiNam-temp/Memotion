@@ -416,3 +416,101 @@ Keep the same task_type and resource_id if present.
         except Exception as e:
             logger.error(f"Failed to refine task: {str(e)}")
             return task  # Return original if refinement fails
+
+    def generate_caretaker_tasks(
+        self,
+        patient_tasks: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate caretaker tasks based on patient tasks.
+        Each caretaker task supports and monitors the corresponding patient task.
+
+        Args:
+            patient_tasks: List of patient task dictionaries.
+
+        Returns:
+            List of caretaker task dictionaries.
+        """
+        try:
+            logger.info(f"Generating caretaker tasks for {len(patient_tasks)} patient tasks")
+
+            caretaker_tasks = []
+
+            for patient_task in patient_tasks:
+                # Skip if not a patient task
+                if patient_task.get('owner_type') != 'PATIENT':
+                    continue
+
+                # Generate caretaker task based on patient task
+                caretaker_task = self._generate_single_caretaker_task(patient_task)
+                if caretaker_task:
+                    caretaker_tasks.append(caretaker_task)
+
+            logger.info(f"Generated {len(caretaker_tasks)} caretaker tasks")
+            return caretaker_tasks
+
+        except Exception as e:
+            logger.error(f"Failed to generate caretaker tasks: {str(e)}", exc_info=True)
+            raise Exception(f"Caretaker task generation failed: {str(e)}")
+
+    def _generate_single_caretaker_task(
+        self,
+        patient_task: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate a single caretaker task based on a patient task.
+
+        Args:
+            patient_task: Patient task dictionary.
+
+        Returns:
+            Caretaker task dictionary or None if generation fails.
+        """
+        try:
+            task_type = patient_task.get('task_type')
+            title = patient_task.get('title', '')
+            description = patient_task.get('description', '')
+            task_duedate = patient_task.get('task_duedate')
+
+            # Build caretaker task based on task type
+            if task_type == 'MEDICATION':
+                caretaker_title = f"Nhắc nhở bệnh nhân uống thuốc: {title}"
+                caretaker_description = f"Đảm bảo bệnh nhân uống thuốc đúng lịch. Giám sát việc tuân thủ và cung cấp hỗ trợ nếu cần. {description}"
+
+            elif task_type == 'NUTRITION':
+                caretaker_title = f"Hỗ trợ bữa ăn: {title}"
+                caretaker_description = f"Giúp chuẩn bị hoặc nhắc nhở bệnh nhân về bữa ăn. Đảm bảo dinh dưỡng đầy đủ. {description}"
+
+            elif task_type == 'EXERCISE':
+                caretaker_title = f"Giám sát bài tập: {title}"
+                caretaker_description = f"Giám sát và hỗ trợ bệnh nhân trong lúc tập luyện. Đảm bảo an toàn và tư thế đúng. {description}"
+
+            else:  # GENERAL
+                caretaker_title = f"Hỗ trợ nhiệm vụ của bệnh nhân: {title}"
+                caretaker_description = f"Cung cấp hỗ trợ và giám sát cho hoạt động của bệnh nhân. {description}"
+
+            # Create caretaker task with same resource IDs and due date
+            caretaker_task = {
+                'owner_type': 'CARETAKER',
+                'title': caretaker_title,
+                'description': caretaker_description,
+                'task_type': task_type,  # Same task type for consistency
+                'task_duedate': task_duedate,
+                'priority': patient_task.get('priority', 'MEDIUM'),  # Same priority as patient task
+                'status': 'PENDING',
+                'linked_task_id': patient_task.get('task_id')  # Will be set after patient task is created
+            }
+
+            # Copy resource IDs to maintain user logic consistency
+            if 'medication_id' in patient_task:
+                caretaker_task['medication_id'] = patient_task['medication_id']
+            if 'nutrition_id' in patient_task:
+                caretaker_task['nutrition_id'] = patient_task['nutrition_id']
+            if 'exercise_id' in patient_task:
+                caretaker_task['exercise_id'] = patient_task['exercise_id']
+
+            return caretaker_task
+
+        except Exception as e:
+            logger.warning(f"Failed to generate caretaker task for patient task {patient_task.get('title')}: {str(e)}")
+            return None

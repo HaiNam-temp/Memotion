@@ -35,6 +35,9 @@ class TaskRepository:
     def get_care_plan_by_patient_id(self, patient_id: str) -> Optional[CarePlan]:
         return self.db.query(CarePlan).filter(CarePlan.patient_id == patient_id).first()
 
+    def get_care_plan_by_caretaker_id(self, caretaker_id: str) -> Optional[CarePlan]:
+        return self.db.query(CarePlan).filter(CarePlan.caretaker_id == caretaker_id).first()
+
     def update_task(self, task: Task) -> Task:
         self.db.commit()
         self.db.refresh(task)
@@ -48,7 +51,7 @@ class TaskRepository:
         ).all()
 
     def get_medication_tasks_by_date(self, care_plan_id: str, task_date: date, owner_type: str) -> List[Task]:
-        return self.db.query(Task).join(MedicationLibrary, Task.medication_id == MedicationLibrary.medication_id).filter(
+        return self.db.query(Task).options(joinedload(Task.medication)).join(MedicationLibrary, Task.medication_id == MedicationLibrary.medication_id).filter(
             Task.care_plan_id == care_plan_id,
             cast(Task.task_duedate, Date) == task_date,
             Task.owner_type == owner_type,
@@ -56,7 +59,7 @@ class TaskRepository:
         ).all()
 
     def get_nutrition_tasks_by_date(self, care_plan_id: str, task_date: date, owner_type: str) -> List[Task]:
-        return self.db.query(Task).join(NutritionLibrary, Task.nutrition_id == NutritionLibrary.nutrition_id).filter(
+        return self.db.query(Task).options(joinedload(Task.nutrition)).join(NutritionLibrary, Task.nutrition_id == NutritionLibrary.nutrition_id).filter(
             Task.care_plan_id == care_plan_id,
             cast(Task.task_duedate, Date) == task_date,
             Task.owner_type == owner_type,
@@ -64,7 +67,7 @@ class TaskRepository:
         ).all()
 
     def get_exercise_tasks_by_date(self, care_plan_id: str, task_date: date, owner_type: str) -> List[Task]:
-        return self.db.query(Task).join(ExerciseLibrary, Task.exercise_id == ExerciseLibrary.exercise_id).filter(
+        return self.db.query(Task).options(joinedload(Task.exercise)).join(ExerciseLibrary, Task.exercise_id == ExerciseLibrary.exercise_id).filter(
             Task.care_plan_id == care_plan_id,
             cast(Task.task_duedate, Date) == task_date,
             Task.owner_type == owner_type,
@@ -72,10 +75,10 @@ class TaskRepository:
         ).all()
         return self.db.query(Task).filter(Task.care_plan_id == care_plan_id).all()
 
-    def get_caretaker_tasks(self, care_plan_id: str) -> List[Task]:
-        return self.db.query(Task).options(joinedload(Task.linked_task)).filter(
+    def get_tasks_by_care_plan_and_owner(self, care_plan_id: str, owner_type: str) -> List[Task]:
+        return self.db.query(Task).filter(
             Task.care_plan_id == care_plan_id,
-            Task.owner_type == 'CARETAKER'
+            Task.owner_type == owner_type
         ).all()
 
     def delete_tasks_by_care_plan_id(self, care_plan_id: str) -> None:

@@ -71,6 +71,152 @@ def get_caretaker_tasks_with_patient_info(
         logger.error(f"get_caretaker_tasks_with_patient_info error: {str(e)}", exc_info=True)
         raise CustomException(http_code=400, code='400', message=str(e))
 
+@router.get('/by-date', dependencies=[Depends(login_required)], response_model=DataResponse[List[TaskResponse]])
+def get_tasks_by_date(
+    task_date: date = Query(..., description="Date to filter tasks (YYYY-MM-DD)"),
+    task_service: TaskService = Depends(),
+    current_user: User = Depends(UserService.get_current_user)
+) -> Any:
+    """
+    Retrieve user's daily tasks for a specific date.
+    
+    This API allows both patients and caretakers to view their care plan tasks scheduled for a particular day, 
+    including medication reminders, exercise routines, and nutritional tasks.
+    
+    **Authorization**: Authenticated user required (patient or caretaker).
+    
+    **Process**:
+    1. Validates user role and retrieves associated care plan
+    2. Filters tasks by specified date and user's role from database
+    
+    **Response**: List of user's tasks for the requested date.
+    """
+    try:
+        logger.info(f"get_tasks_by_date request: date={task_date}, user_id={current_user.user_id}, role={current_user.role}")
+        tasks = task_service.get_tasks_by_date(task_date, current_user)
+        logger.info(f"get_tasks_by_date success: {len(tasks)} tasks for date {task_date}")
+        return DataResponse().success_response(data=tasks)
+    except Exception as e:
+        logger.error(f"get_tasks_by_date error: {str(e)}", exc_info=True)
+        raise CustomException(http_code=400, code='400', message=str(e))
+
+@router.get('/medication-tasks', dependencies=[Depends(login_required)], response_model=DataResponse[List[TaskDetailResponse]])
+def get_medication_tasks_by_date(
+    task_date: date = Query(..., description="Date to filter tasks (YYYY-MM-DD)"),
+    task_service: TaskService = Depends(),
+    current_user: User = Depends(UserService.get_current_user)
+) -> Any:
+    """
+    Retrieve user's medication tasks for a specific date.
+    
+    This API provides detailed medication tasks for users on a given date, 
+    including dosage, timing, and administration instructions.
+    
+    **Authorization**: Authenticated user required (patient or caretaker).
+    
+    **Process**:
+    1. Validates user access to medication tasks
+    2. Filters medication tasks by specified date from database
+    
+    **Response**: List of detailed medication tasks for the requested date.
+    """
+    try:
+        logger.info(f"get_medication_tasks_by_date request: date={task_date}, user_id={current_user.user_id}")
+        tasks = task_service.get_medication_tasks_by_date(task_date, current_user)
+        logger.info(f"get_medication_tasks_by_date success: {len(tasks)} medication tasks for date {task_date}")
+        return DataResponse().success_response(data=tasks)
+    except Exception as e:
+        logger.error(f"get_medication_tasks_by_date error: {str(e)}", exc_info=True)
+        raise CustomException(http_code=400, code='400', message=str(e))
+
+@router.get('/nutrition-tasks', dependencies=[Depends(login_required)], response_model=DataResponse[List[TaskDetailResponse]])
+def get_nutrition_tasks_by_date(
+    task_date: date = Query(..., description="Date to filter tasks (YYYY-MM-DD)"),
+    task_service: TaskService = Depends(),
+    current_user: User = Depends(UserService.get_current_user)
+) -> Any:
+    """
+    Retrieve user's nutrition tasks for a specific date.
+    
+    This API provides detailed nutrition tasks for users on a given date, 
+    including meal plans, dietary recommendations, and nutritional guidelines.
+    
+    **Authorization**: Authenticated user required (patient or caretaker).
+    
+    **Process**:
+    1. Validates user access to nutrition tasks
+    2. Filters nutrition tasks by specified date from database
+    
+    **Response**: List of detailed nutrition tasks for the requested date.
+    """
+    try:
+        logger.info(f"get_nutrition_tasks_by_date request: date={task_date}, user_id={current_user.user_id}")
+        tasks = task_service.get_nutrition_tasks_by_date(task_date, current_user)
+        logger.info(f"get_nutrition_tasks_by_date success: {len(tasks)} nutrition tasks for date {task_date}")
+        return DataResponse().success_response(data=tasks)
+    except Exception as e:
+        logger.error(f"get_nutrition_tasks_by_date error: {str(e)}", exc_info=True)
+        raise CustomException(http_code=400, code='400', message=str(e))
+
+@router.get('/exercise-tasks', dependencies=[Depends(login_required)], response_model=DataResponse[List[TaskDetailResponse]])
+def get_exercise_tasks_by_date(
+    task_date: date = Query(..., description="Date to filter tasks (YYYY-MM-DD)"),
+    task_service: TaskService = Depends(),
+    current_user: User = Depends(UserService.get_current_user)
+) -> Any:
+    """
+    Retrieve user's exercise tasks for a specific date.
+    
+    This API provides detailed exercise tasks for users on a given date, 
+    including workout routines, physical therapy exercises, and activity recommendations.
+    
+    **Authorization**: Authenticated user required (patient or caretaker).
+    
+    **Process**:
+    1. Validates user access to exercise tasks
+    2. Filters exercise tasks by specified date from database
+    
+    **Response**: List of detailed exercise tasks for the requested date.
+    """
+    try:
+        logger.info(f"get_exercise_tasks_by_date request: date={task_date}, user_id={current_user.user_id}")
+        tasks = task_service.get_exercise_tasks_by_date(task_date, current_user)
+        logger.info(f"get_exercise_tasks_by_date success: {len(tasks)} exercise tasks for date {task_date}")
+        return DataResponse().success_response(data=tasks)
+    except Exception as e:
+        logger.error(f"get_exercise_tasks_by_date error: {str(e)}", exc_info=True)
+        raise CustomException(http_code=400, code='400', message=str(e))
+
+@router.put('/{task_id}/complete', dependencies=[Depends(login_required)], response_model=DataResponse[TaskResponse])
+def complete_task(
+    task_id: str,
+    task_service: TaskService = Depends(),
+    current_user: User = Depends(UserService.get_current_user)
+) -> Any:
+    """
+    Mark a task as completed.
+    
+    This API allows both patients and caretakers to mark care plan tasks as completed, 
+    updating the task status and completion timestamp.
+    
+    **Authorization**: Authenticated user required (patient or assigned caretaker).
+    
+    **Process**:
+    1. Validates user access to the specified task
+    2. Updates task status to completed in database
+    3. Returns updated task information
+    
+    **Response**: Updated task details with completion status.
+    """
+    try:
+        logger.info(f"complete_task request: task_id={task_id}, user_id={current_user.user_id}")
+        task = task_service.complete_task(task_id, current_user)
+        logger.info(f"complete_task success: task_id={task_id}")
+        return DataResponse().success_response(data=task)
+    except Exception as e:
+        logger.error(f"complete_task error: {str(e)}", exc_info=True)
+        raise CustomException(http_code=400, code='400', message=str(e))
+
 @router.get('/{task_id}', dependencies=[Depends(login_required)], response_model=DataResponse[TaskDetailResponse])
 def get_task_detail(
     task_id: str,
@@ -98,150 +244,4 @@ def get_task_detail(
         return DataResponse().success_response(data=task_detail)
     except Exception as e:
         logger.error(f"get_task_detail error: {str(e)}", exc_info=True)
-        raise CustomException(http_code=400, code='400', message=str(e))
-
-@router.get('/patient/by-date', dependencies=[Depends(login_required)], response_model=DataResponse[List[TaskResponse]])
-def get_patient_tasks_by_date(
-    task_date: date = Query(..., description="Date to filter tasks (YYYY-MM-DD)"),
-    task_service: TaskService = Depends(),
-    current_user: User = Depends(UserService.get_current_user)
-) -> Any:
-    """
-    Retrieve patient's daily tasks for a specific date.
-    
-    This API allows patients to view all their care plan tasks scheduled for a particular day, 
-    including medication, exercise, and nutrition tasks.
-    
-    **Authorization**: Authenticated user required (patient or assigned caretaker).
-    
-    **Process**:
-    1. Validates user access to patient tasks
-    2. Filters tasks by specified date from database
-    
-    **Response**: List of patient's tasks for the requested date.
-    """
-    try:
-        logger.info(f"get_patient_tasks_by_date request: date={task_date}, user_id={current_user.user_id}")
-        tasks = task_service.get_patient_tasks_by_date(task_date, current_user)
-        logger.info(f"get_patient_tasks_by_date success: {len(tasks)} tasks for date {task_date}")
-        return DataResponse().success_response(data=tasks)
-    except Exception as e:
-        logger.error(f"get_patient_tasks_by_date error: {str(e)}", exc_info=True)
-        raise CustomException(http_code=400, code='400', message=str(e))
-
-@router.get('/patient/medication-tasks', dependencies=[Depends(login_required)], response_model=DataResponse[List[TaskDetailResponse]])
-def get_patient_medication_tasks_by_date(
-    task_date: date = Query(..., description="Date to filter tasks (YYYY-MM-DD)"),
-    task_service: TaskService = Depends(),
-    current_user: User = Depends(UserService.get_current_user)
-) -> Any:
-    """
-    Retrieve patient's medication tasks for a specific date.
-    
-    This API provides detailed medication tasks for patients on a given date, 
-    including dosage, timing, and administration instructions.
-    
-    **Authorization**: Authenticated user required (patient or assigned caretaker).
-    
-    **Process**:
-    1. Validates user access to patient medication tasks
-    2. Filters medication tasks by specified date from database
-    
-    **Response**: List of detailed medication tasks for the requested date.
-    """
-    try:
-        logger.info(f"get_patient_medication_tasks_by_date request: date={task_date}, user_id={current_user.user_id}")
-        tasks = task_service.get_patient_medication_tasks_by_date(task_date, current_user)
-        logger.info(f"get_patient_medication_tasks_by_date success: {len(tasks)} medication tasks for date {task_date}")
-        return DataResponse().success_response(data=tasks)
-    except Exception as e:
-        logger.error(f"get_patient_medication_tasks_by_date error: {str(e)}", exc_info=True)
-        raise CustomException(http_code=400, code='400', message=str(e))
-
-@router.get('/patient/nutrition-tasks', dependencies=[Depends(login_required)], response_model=DataResponse[List[TaskDetailResponse]])
-def get_patient_nutrition_tasks_by_date(
-    task_date: date = Query(..., description="Date to filter tasks (YYYY-MM-DD)"),
-    task_service: TaskService = Depends(),
-    current_user: User = Depends(UserService.get_current_user)
-) -> Any:
-    """
-    Retrieve patient's nutrition tasks for a specific date.
-    
-    This API provides detailed nutrition tasks for patients on a given date, 
-    including meal plans, dietary recommendations, and nutritional guidelines.
-    
-    **Authorization**: Authenticated user required (patient or assigned caretaker).
-    
-    **Process**:
-    1. Validates user access to patient nutrition tasks
-    2. Filters nutrition tasks by specified date from database
-    
-    **Response**: List of detailed nutrition tasks for the requested date.
-    """
-    try:
-        logger.info(f"get_patient_nutrition_tasks_by_date request: date={task_date}, user_id={current_user.user_id}")
-        tasks = task_service.get_patient_nutrition_tasks_by_date(task_date, current_user)
-        logger.info(f"get_patient_nutrition_tasks_by_date success: {len(tasks)} nutrition tasks for date {task_date}")
-        return DataResponse().success_response(data=tasks)
-    except Exception as e:
-        logger.error(f"get_patient_nutrition_tasks_by_date error: {str(e)}", exc_info=True)
-        raise CustomException(http_code=400, code='400', message=str(e))
-
-@router.get('/patient/exercise-tasks', dependencies=[Depends(login_required)], response_model=DataResponse[List[TaskDetailResponse]])
-def get_patient_exercise_tasks_by_date(
-    task_date: date = Query(..., description="Date to filter tasks (YYYY-MM-DD)"),
-    task_service: TaskService = Depends(),
-    current_user: User = Depends(UserService.get_current_user)
-) -> Any:
-    """
-    Retrieve patient's exercise tasks for a specific date.
-    
-    This API provides detailed exercise tasks for patients on a given date, 
-    including workout routines, physical therapy exercises, and activity recommendations.
-    
-    **Authorization**: Authenticated user required (patient or assigned caretaker).
-    
-    **Process**:
-    1. Validates user access to patient exercise tasks
-    2. Filters exercise tasks by specified date from database
-    
-    **Response**: List of detailed exercise tasks for the requested date.
-    """
-    try:
-        logger.info(f"get_patient_exercise_tasks_by_date request: date={task_date}, user_id={current_user.user_id}")
-        tasks = task_service.get_patient_exercise_tasks_by_date(task_date, current_user)
-        logger.info(f"get_patient_exercise_tasks_by_date success: {len(tasks)} exercise tasks for date {task_date}")
-        return DataResponse().success_response(data=tasks)
-    except Exception as e:
-        logger.error(f"get_patient_exercise_tasks_by_date error: {str(e)}", exc_info=True)
-        raise CustomException(http_code=400, code='400', message=str(e))
-
-@router.put('/patient/{task_id}/complete', dependencies=[Depends(login_required)], response_model=DataResponse[TaskResponse])
-def complete_task(
-    task_id: str,
-    task_service: TaskService = Depends(),
-    current_user: User = Depends(UserService.get_current_user)
-) -> Any:
-    """
-    Mark a patient task as completed.
-    
-    This API allows patients to mark their care plan tasks as completed, 
-    updating the task status and completion timestamp.
-    
-    **Authorization**: Authenticated user required (task owner or assigned caretaker).
-    
-    **Process**:
-    1. Validates user access to the specified task
-    2. Updates task status to completed in database
-    3. Returns updated task information
-    
-    **Response**: Updated task details with completion status.
-    """
-    try:
-        logger.info(f"complete_task request: task_id={task_id}, user_id={current_user.user_id}")
-        task = task_service.complete_task(task_id, current_user)
-        logger.info(f"complete_task success: task_id={task_id}")
-        return DataResponse().success_response(data=task)
-    except Exception as e:
-        logger.error(f"complete_task error: {str(e)}", exc_info=True)
         raise CustomException(http_code=400, code='400', message=str(e))

@@ -22,3 +22,5 @@ class Task(Base):
 
     medication = relationship("MedicationLibrary", foreign_keys=[medication_id], lazy="joined")
     linked_task = relationship("Task", remote_side=[task_id], foreign_keys=[linked_task_id])
+    nutrition = relationship("NutritionLibrary", foreign_keys=[nutrition_id], lazy="joined")
+    exercise = relationship("ExerciseLibrary", foreign_keys=[exercise_id], lazy="joined")

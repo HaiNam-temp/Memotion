@@ -380,21 +380,91 @@ class CarePlanService:
     ) -> Dict[str, Any]:
         """
         Update care plan for the patient assigned to the caretaker.
+        Includes regeneration of caretaker support tasks.
+
+        Args:
+            current_user: Current logged-in caretaker.
+            plan_duration_days: Duration of care plan.
+
+        Returns:
+            Updated care plan data including caretaker tasks.
+
+        Raises:
+            CustomException: If user is not caretaker or patient not found.
         """
+        # Validate role
+        if current_user.role != UserRole.CARETAKER.value:
+            raise CustomException(
+                http_code=403,
+                code='403',
+                message='Only caretakers can update care plans'
+            )
+
         # Get assigned patient
-        patient = self.user_repo.get_assigned_patient(current_user.user_id)
-        if not patient:
+        patient_id = self.user_repo.get_patient_id_by_caretaker(current_user.user_id)
+        if not patient_id:
             raise CustomException(
                 http_code=404,
                 code='404',
-                message='No patient assigned to this caretaker.'
+                message='No patient assigned to this caretaker'
             )
 
-        return self.update_care_plan_for_patient(
-            patient_id=patient.user_id,
+        # Update patient care plan
+        result = self.update_care_plan_for_patient(
+            patient_id=patient_id,
             caretaker_id=current_user.user_id,
             plan_duration_days=plan_duration_days
         )
+
+        # Generate caretaker support tasks
+        care_plan_id = result['care_plan_id']
+        patient_tasks = self.task_repo.get_tasks_by_care_plan_and_owner(care_plan_id, 'PATIENT')
+        
+        # Convert Task objects to dicts for AI agent
+        patient_task_dicts = []
+        for task in patient_tasks:
+            task_dict = {
+                'task_id': str(task.task_id),
+                'title': task.title,
+                'description': task.description,
+                'task_type': task.task_type,
+                'owner_type': task.owner_type,
+                'task_duedate': task.task_duedate.isoformat() if task.task_duedate else None,
+                'status': task.status,
+            }
+            if task.medication_id:
+                task_dict['medication_id'] = str(task.medication_id)
+            if task.nutrition_id:
+                task_dict['nutrition_id'] = str(task.nutrition_id)
+            if task.exercise_id:
+                task_dict['exercise_id'] = str(task.exercise_id)
+            patient_task_dicts.append(task_dict)
+
+        # Generate caretaker tasks using AI agent
+        caretaker_task_dicts = self.ai_agent.generate_caretaker_tasks(patient_task_dicts)
+
+        # Persist caretaker tasks
+        created_caretaker_tasks = []
+        for caretaker_task_dict in caretaker_task_dicts:
+            caretaker_task_dict['care_plan_id'] = care_plan_id
+            # Remove priority if present (Task model doesn't have priority field)
+            caretaker_task_dict.pop('priority', None)
+            # Convert linked_task_id to UUID
+            if 'linked_task_id' in caretaker_task_dict:
+                caretaker_task_dict['linked_task_id'] = UUID(caretaker_task_dict['linked_task_id'])
+            # Convert task_duedate to datetime
+            if 'task_duedate' in caretaker_task_dict and caretaker_task_dict['task_duedate']:
+                caretaker_task_dict['task_duedate'] = datetime.fromisoformat(caretaker_task_dict['task_duedate'])
+            caretaker_task = Task(**caretaker_task_dict)
+            created_caretaker_tasks.append(self.task_repo.create_task(caretaker_task))
+
+        # Update response with caretaker tasks info
+        result['caretaker_tasks_updated'] = len(created_caretaker_tasks)
+        result['total_tasks'] += len(created_caretaker_tasks)
+
+        logger.info(f"Updated care plan with {result['total_tasks']} total tasks ({result['tasks_updated']} patient + {len(created_caretaker_tasks)} caretaker)")
+
+        return result
 
     def _build_generation_response(
         self,
@@ -424,6 +494,7 @@ class CarePlanService:
     ) -> Dict[str, Any]:
         """
         Generate care plan for the patient assigned to this caretaker.
+        Includes generation of caretaker support tasks.
 
         Args:
             current_user: Current logged-in caretaker.
@@ -431,7 +502,7 @@ class CarePlanService:
             regenerate: Whether to regenerate existing plan.
 
         Returns:
-            Generated care plan data.
+            Generated care plan data including caretaker tasks.
 
         Raises:
             CustomException: If user is not caretaker or patient not found.
@@ -453,13 +524,63 @@ class CarePlanService:
                 message='No patient assigned to this caretaker'
             )
 
-        # Generate plan
-        return self.generate_care_plan_for_patient(
+        # Generate patient care plan
+        result = self.generate_care_plan_for_patient(
             patient_id=patient_id,
             caretaker_id=current_user.user_id,
             plan_duration_days=plan_duration_days,
             regenerate=regenerate
         )
+
+        # Generate caretaker support tasks
+        care_plan_id = result['care_plan_id']
+        patient_tasks = self.task_repo.get_tasks_by_care_plan_and_owner(care_plan_id, 'PATIENT')
+        
+        # Convert Task objects to dicts for AI agent
+        patient_task_dicts = []
+        for task in patient_tasks:
+            task_dict = {
+                'task_id': str(task.task_id),
+                'title': task.title,
+                'description': task.description,
+                'task_type': task.task_type,
+                'owner_type': task.owner_type,
+                'task_duedate': task.task_duedate.isoformat() if task.task_duedate else None,
+                'status': task.status,
+            }
+            if task.medication_id:
+                task_dict['medication_id'] = str(task.medication_id)
+            if task.nutrition_id:
+                task_dict['nutrition_id'] = str(task.nutrition_id)
+            if task.exercise_id:
+                task_dict['exercise_id'] = str(task.exercise_id)
+            patient_task_dicts.append(task_dict)
+
+        # Generate caretaker tasks using AI agent
+        caretaker_task_dicts = self.ai_agent.generate_caretaker_tasks(patient_task_dicts)
+
+        # Persist caretaker tasks
+        created_caretaker_tasks = []
+        for caretaker_task_dict in caretaker_task_dicts:
+            caretaker_task_dict['care_plan_id'] = care_plan_id
+            # Remove priority if present (Task model doesn't have priority field)
+            caretaker_task_dict.pop('priority', None)
+            # Convert linked_task_id to UUID
+            if 'linked_task_id' in caretaker_task_dict:
+                caretaker_task_dict['linked_task_id'] = UUID(caretaker_task_dict['linked_task_id'])
+            # Convert task_duedate to datetime
+            if 'task_duedate' in caretaker_task_dict and caretaker_task_dict['task_duedate']:
+                caretaker_task_dict['task_duedate'] = datetime.fromisoformat(caretaker_task_dict['task_duedate'])
+            caretaker_task = Task(**caretaker_task_dict)
+            created_caretaker_tasks.append(self.task_repo.create_task(caretaker_task))
+
+        # Update response with caretaker tasks info
+        result['caretaker_tasks_created'] = len(created_caretaker_tasks)
+        result['total_tasks'] += len(created_caretaker_tasks)
+
+        logger.info(f"Generated care plan with {result['total_tasks']} total tasks ({result['tasks_created']} patient + {len(created_caretaker_tasks)} caretaker)")
+
+        return result
 
     def get_care_plan_summary(self, patient_id: UUID) -> Dict[str, Any]:
         """

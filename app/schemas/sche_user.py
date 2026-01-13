@@ -11,6 +11,7 @@ class UserBase(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     is_active: Optional[bool] = True
+    role: Optional[str] = "PATIENT"  # Default to PATIENT
 
     class Config:
         orm_mode = True
@@ -30,7 +31,7 @@ class UserItemResponse(UserBase):
     email: EmailStr
     phone: Optional[str] = None
     is_active: bool
-    role: str
+    role: Optional[str] = "PATIENT"  # Default to PATIENT
     patient: Optional[PatientInfoResponse] = None
     # last_login: Optional[datetime] # Removed as it is not in the new model
 
@@ -56,15 +57,18 @@ class UserRegisterRequest(BaseModel):
     patient_phone: Optional[str] = None
 
 
+class UserRegisterV2Request(BaseModel):
+    full_name: str
+    email: EmailStr
+    password: str = Field(..., min_length=6, max_length=72)
+    phone: Optional[str] = None
+
+
 class UserUpdateMeRequest(BaseModel):
     full_name: Optional[str]
     email: Optional[EmailStr]
     password: Optional[str]
 
 
-class UserUpdateRequest(BaseModel):
-    full_name: Optional[str]
-    email: Optional[EmailStr]
-    password: Optional[str]
-    is_active: Optional[bool] = True
-    role: Optional[UserRole]
+class UserUpdateRoleRequest(BaseModel):
+    role: UserRole

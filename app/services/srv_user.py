@@ -11,7 +11,7 @@ from app.models.model_user import User
 from app.core.config import settings
 from app.core.security import verify_password, get_password_hash
 from app.schemas.sche_token import TokenPayload
-from app.schemas.sche_user import UserCreateRequest, UserUpdateMeRequest, UserUpdateRequest, UserRegisterRequest
+from app.schemas.sche_user import UserCreateRequest, UserUpdateMeRequest, UserRegisterRequest, UserRegisterV2Request, UserUpdateRoleRequest
 from app.repository.repo_user import UserRepository
 from app.helpers.enums import UserRole
 
@@ -118,6 +118,25 @@ class UserService:
 
         return created_user
 
+    def register_user_v2(self, data: UserRegisterV2Request):
+        if self.user_repo.get_by_email(data.email):
+            raise Exception('Email already exists')
+        
+        if data.phone and self.user_repo.get_by_phone(data.phone):
+            raise Exception('Phone number already exists')
+        
+        hashed_password = get_password_hash(data.password)
+        new_user = User(
+            full_name=data.full_name,
+            email=data.email,
+            hashed_password=hashed_password,
+            phone=data.phone,
+            is_active=True,
+            role="PATIENT",  # Default role to PATIENT
+        )
+        created_user = self.user_repo.create(new_user)
+        return created_user
+
     def update_me(self, data: UserUpdateMeRequest, current_user: User):
         if data.email is not None:
             exist_user = self.user_repo.get_by_email(data.email)
@@ -131,9 +150,24 @@ class UserService:
             
         return self.user_repo.update(current_user)
 
-    def get(self, user_id):
+    def update_user_role(self, user_id: str, current_user: User):
+        """
+        Update user role with restrictions.
+        Only allows changing from PATIENT to CARETAKER.
+        """
+        # Since user_id comes from token, it's always the current user
         user = self.user_repo.get_by_id(user_id)
         if not user:
-            raise Exception('User not exists')
-        return user
+            raise CustomException(http_code=404, code='404', message="User not found")
+        
+        # Check if role can be updated (only from PATIENT to CARETAKER)
+        if user.role != UserRole.PATIENT.value:
+            raise CustomException(http_code=400, code='400', message="Role can only be changed from PATIENT to CARETAKER")
+        
+        # Update role to CARETAKER
+        user.role = UserRole.CARETAKER.value
+        updated_user = self.user_repo.update(user)
+        
+        logger.info(f"User role updated: {user_id} from {UserRole.PATIENT.value} to {UserRole.CARETAKER.value}")
+        return updated_user
 
