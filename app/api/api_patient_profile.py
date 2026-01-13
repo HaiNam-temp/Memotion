@@ -149,7 +149,7 @@ def create_physical_therapy_profile(
     try:
         logger.info(f"create_physical_therapy_profile request: caretaker_id={current_user.user_id}")
         therapy = profile_service.create_physical_therapy_profile(therapy_data, current_user)
-        logger.info(f"create_physical_therapy_profile success: therapy_id={therapy.patient_id}")
+        logger.info(f"create_physical_therapy_profile success: therapy_id={therapy.profile_id}")
         return DataResponse().success_response(data=therapy)
     except Exception as e:
         logger.error(f"create_physical_therapy_profile error: {str(e)}", exc_info=True)
@@ -177,7 +177,7 @@ def get_physical_therapy_profile(
     try:
         logger.info(f"get_physical_therapy_profile request: user_id={current_user.user_id}")
         therapy = profile_service.get_physical_therapy_profile(current_user)
-        logger.info(f"get_physical_therapy_profile success: therapy_id={therapy.patient_id if therapy else 'None'}")
+        logger.info(f"get_physical_therapy_profile success: therapy_id={therapy.profile_id if therapy else 'None'}")
         return DataResponse().success_response(data=therapy)
     except Exception as e:
         logger.error(f"get_physical_therapy_profile error: {str(e)}", exc_info=True)
@@ -207,7 +207,7 @@ def update_physical_therapy_profile(
     try:
         logger.info(f"update_physical_therapy_profile request: user_id={current_user.user_id}")
         therapy = profile_service.update_physical_therapy_profile(therapy_data, current_user)
-        logger.info(f"update_physical_therapy_profile success: therapy_id={therapy.patient_id}")
+        logger.info(f"update_physical_therapy_profile success: therapy_id={therapy.profile_id}")
         return DataResponse().success_response(data=therapy)
     except Exception as e:
         logger.error(f"update_physical_therapy_profile error: {str(e)}", exc_info=True)
