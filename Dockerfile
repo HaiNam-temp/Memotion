@@ -9,8 +9,11 @@ ENV PYTHONUNBUFFERED=1
 # Update and install system dependencies required for building python packages
 # gcc and build-essential are often needed for numpy, pandas, etc.
 # libpq-dev is needed to build psycopg2
+# FFmpeg libraries and pkg-config are needed for PyAV (av package)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc libpq-dev build-essential && \
+    apt-get install -y --no-install-recommends gcc libpq-dev build-essential \
+    ffmpeg libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev \
+    libavfilter-dev libswscale-dev libswresample-dev pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
