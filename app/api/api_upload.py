@@ -73,6 +73,8 @@ async def upload_file(file: UploadFile = File(...), type: str = Form(...)) -> An
         # Return relative path
         relative_path = f"/static/uploads/{type}/{new_filename}"
         
+        logger.info(f"Uploaded file path: {relative_path}")
+        
         return DataResponse().success_response(data=relative_path)
 
     except CustomException as e:

@@ -40,6 +40,7 @@ class UserService:
 
     @staticmethod
     def get_current_user(http_authorization_credentials=Depends(reusable_oauth2)) -> User:
+        logger.info(f"Received authorization credentials: {http_authorization_credentials}")
         try:
             payload = jwt.decode(
                 http_authorization_credentials.credentials, settings.SECRET_KEY,

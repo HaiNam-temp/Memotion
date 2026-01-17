@@ -62,6 +62,7 @@ jobs:
               -e SQL_DATABASE_URL="postgresql://postgres:postgres@host.docker.internal:5333/memotion_db" \
               -e SECRET_KEY="changeme" \
               -e PROJECT_NAME="Memotion" \
+              -e GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
               -v /home/hieuvu/static:/app/static \
               -p 8005:8005 ${DOCKER_IMAGE}
           EOF

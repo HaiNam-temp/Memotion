@@ -6,11 +6,12 @@ from fastapi import FastAPI
 from fastapi_sqlalchemy import DBSessionMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 
 from app.api.api_router import router
 from app.models import Base
 from app.db.base import engine
-from app.core.config import settings
+from app.core.config import settings, BASE_DIR
 from app.helpers.exception_handler import CustomException, http_exception_handler
 from sqlalchemy import text
 
@@ -48,6 +49,20 @@ def get_application() -> FastAPI:
     application.add_exception_handler(CustomException, http_exception_handler)
     
     os.makedirs("static", exist_ok=True)
+
+    # Add CORS for static files
+    @application.get("/static/{path:path}")
+    async def serve_static_with_cors(path: str):
+        file_path = os.path.join(BASE_DIR, 'static', path)
+        if os.path.exists(file_path):
+            response = FileResponse(file_path)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            return response
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="File not found")
+
     application.mount("/static", StaticFiles(directory="static"), name="static")
 
     for route in application.routes:

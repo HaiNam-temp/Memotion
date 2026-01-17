@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api import api_user, api_auth, api_healthcheck, api_patient_profile, api_task, api_upload, api_nutrition_library, api_medication_library, api_exercise_library, api_notification, api_care_plan
+from app.api import api_user, api_auth, api_healthcheck, api_patient_profile, api_task, api_upload, api_nutrition_library, api_medication_library, api_exercise_library, api_notification, api_care_plan, api_pose_detection
 
 router = APIRouter()
 
@@ -15,3 +15,4 @@ router.include_router(api_nutrition_library.router, tags=["nutrition-library"], 
 router.include_router(api_medication_library.router, tags=["medication-library"], prefix="/medication-library")
 router.include_router(api_exercise_library.router, tags=["exercise-library"], prefix="/exercise-library")
 router.include_router(api_notification.router, tags=["notification"], prefix="/notifications")
+router.include_router(api_pose_detection.router, tags=["pose-detection"], prefix="/tasks")

@@ -1,5 +1,5 @@
 from fastapi import Depends
-from typing import List
+from typing import List, Optional
 from app.repository.repo_exercise_library import ExerciseLibraryRepository
 from app.schemas.sche_exercise_library import ExerciseLibraryCreateRequest, ExerciseLibraryResponse
 
@@ -15,5 +15,8 @@ class ExerciseLibraryService:
         exercises = self.exercise_repo.get_all(limit=limit)
         return [ExerciseLibraryResponse.from_orm(e) for e in exercises]
 
-    def delete_exercise(self, exercise_id: str) -> bool:
-        return self.exercise_repo.delete(exercise_id)
+    def get_exercise_by_id(self, exercise_id: str) -> Optional[ExerciseLibraryResponse]:
+        exercise = self.exercise_repo.get_by_id(exercise_id)
+        if exercise:
+            return ExerciseLibraryResponse.from_orm(exercise)
+        return None
