@@ -13,4 +13,5 @@ class User(Base):
     phone = Column(String(50))
     role = Column(String(20), nullable=False)
     is_active = Column(Boolean, default=True)
+    is_first_login = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())

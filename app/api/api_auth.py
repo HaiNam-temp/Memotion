@@ -3,6 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import EmailStr, BaseModel
+from fastapi_sqlalchemy import db
 
 from app.core.security import create_access_token
 from app.helpers.exception_handler import CustomException
@@ -24,6 +25,11 @@ def login_access_token(form_data: LoginRequest, user_service: UserService = Depe
         raise CustomException(http_code=400, code='400', message='Incorrect email or password')
     elif not user.is_active:
         raise CustomException(http_code=400, code='400', message='Inactive user')
+
+    # Update is_first_login to False if it's True
+    if user.is_first_login:
+        user.is_first_login = False
+        db.session.commit()
 
     return DataResponse().success_response(data=Token(access_token=create_access_token(user_id=str(user.user_id))))
 

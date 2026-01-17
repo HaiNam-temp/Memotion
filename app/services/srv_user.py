@@ -80,6 +80,7 @@ class UserService:
             phone=data.phone,
             is_active=True,
             role=data.role.value,
+            is_first_login=True,
         )
         created_user = self.user_repo.create(new_user)
 
@@ -104,7 +105,8 @@ class UserService:
                 hashed_password=hashed_password, # Same password as caretaker
                 phone=data.patient_phone,
                 is_active=True,
-                role=UserRole.PATIENT.value
+                role=UserRole.PATIENT.value,
+                is_first_login=True,
             )
             created_patient = self.user_repo.create(patient_user)
             
@@ -134,6 +136,7 @@ class UserService:
             phone=data.phone,
             is_active=True,
             role="CARETAKER",  # Default role to CARETAKER
+            is_first_login=True,
         )
         created_user = self.user_repo.create(new_user)
         return created_user

@@ -11,6 +11,7 @@ class UserBase(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     is_active: Optional[bool] = True
+    is_first_login: Optional[bool] = True
     role: Optional[str] = "PATIENT"  # Default to PATIENT
 
     class Config:
@@ -31,6 +32,7 @@ class UserItemResponse(UserBase):
     email: EmailStr
     phone: Optional[str] = None
     is_active: bool
+    is_first_login: bool
     role: Optional[str] = "PATIENT"  # Default to PATIENT
     patient: Optional[PatientInfoResponse] = None
     # last_login: Optional[datetime] # Removed as it is not in the new model
