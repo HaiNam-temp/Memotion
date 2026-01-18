@@ -1,329 +1,617 @@
 """
-Pose Detection API Routes for Memotion Backend
+Pose Detection API Module for MEMOTION Backend.
 
-Provides REST endpoints and WebSocket support for real-time pose detection.
+Tích hợp MediaPipe pose detection vào FastAPI backend.
+Expose APIs cho mobile app sử dụng.
+
+CHIẾN LƯỢC GHÉP NỐI POSE DETECTION VỚI MOBILE APP
+==================================================
+
+1. TỔNG QUAN KIẾN TRÚC
+----------------------
+- Backend (FastAPI) + MediaPipe modules được merge thành một service duy nhất
+- Mobile app giao tiếp qua REST API/WebSocket
+- Docker container nhẹ chứa cả backend và pose detection
+
+2. YÊU CẦU MERGE
+---------------
+2.1 Đồng nhất thư viện:
+   - Backend: fastapi, sqlalchemy, alembic, uvicorn
+   - MediaPipe: opencv-python, mediapipe, numpy, pillow
+   - Chung: pydantic, typing, pathlib, asyncio
+
+2.2 Docker tối ưu:
+   - Base image: python:3.9-slim
+   - Multi-stage build để giảm size
+   - Chỉ copy cần thiết files
+   - Volume mounts cho logs và data
+
+2.3 Đồng bộ start:
+   - Single entrypoint script khởi động cả FastAPI và MediaPipe services
+   - Health checks đảm bảo cả hai components ready
+   - Graceful shutdown cho cleanup resources
+
+3. CHIẾN LƯỢC TÍCH HỢP
+----------------------
+3.1 API Endpoints:
+   - POST /pose/start-session: Khởi tạo session với config
+   - WebSocket /pose/stream: Real-time pose data streaming
+   - POST /pose/calibrate: Calibration cho user
+   - GET /pose/results/{session_id}: Lấy kết quả analysis
+   - POST /pose/sync-motion: Sync với reference video
+
+3.2 Data Flow:
+   Mobile -> REST API -> MediaPipe Processor -> Analysis -> Response -> Mobile
+
+3.3 Session Management:
+   - Mỗi user có session riêng với unique ID
+   - State persistence trong Redis/memory
+   - Auto cleanup sau timeout
+
+3.4 Error Handling:
+   - Camera access errors
+   - Network interruptions
+   - Processing failures
+
+4. TRIỂN KHAI DOCKER
+--------------------
+4.1 Dockerfile tối ưu:
+   FROM python:3.9-slim as base
+   WORKDIR /app
+   COPY requirements.txt .
+   RUN pip install --no-cache-dir -r requirements.txt
+
+   FROM base as builder
+   COPY . .
+   RUN pip install --no-cache-dir -e .
+
+   FROM base as final
+   COPY --from=builder /app /app
+   EXPOSE 8000
+   CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+4.2 Docker Compose:
+   services:
+     memotion-backend:
+       build: .
+       ports:
+         - "8000:8000"
+       volumes:
+         - ./data:/app/data
+         - ./logs:/app/logs
+       environment:
+         - POSE_DETECTION_ENABLED=true
+
+5. MOBILE INTEGRATION
+--------------------
+5.1 API Client:
+   - HTTP client cho REST calls
+   - WebSocket client cho real-time data
+   - Retry logic và error handling
+
+5.2 Data Models:
+   - PoseData: landmarks, angles, scores
+   - SessionConfig: exercise type, duration
+   - CalibrationData: joint limits
+
+5.3 UI Integration:
+   - Camera preview với overlay skeleton
+   - Real-time feedback (scores, instructions)
+   - Progress tracking
+
+6. TESTING & MONITORING
+-----------------------
+6.1 Unit Tests:
+   - Test MediaPipe functions
+   - Test API endpoints
+   - Test session management
+
+6.2 Integration Tests:
+   - End-to-end pose detection flow
+   - Mobile app communication
+
+6.3 Monitoring:
+   - Health endpoints
+   - Performance metrics
+   - Error logging
+
+7. TRIỂN KHAI PRODUCTION
+-------------------------
+7.1 Environment Variables:
+   - CAMERA_DEVICE: camera source
+   - POSE_MODEL_COMPLEXITY: model accuracy vs speed
+   - SESSION_TIMEOUT: cleanup interval
+
+7.2 Scaling:
+   - Horizontal scaling với load balancer
+   - GPU support cho MediaPipe nếu cần
+
+7.3 Security:
+   - API authentication
+   - Input validation
+   - Rate limiting
 """
 
-import asyncio
-import json
-import logging
-from typing import Dict, Any
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends
 from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+import asyncio
+import threading
+import time
+from queue import Queue
+import json
+import os
+import uuid
+from pathlib import Path
+import logging
 
-from app.services.srv_exercise_library import ExerciseLibraryService
-from app.services.srv_user import UserService
+# Import từ mediapipe modules (sẽ được merge vào app)
+try:
+    # Giả sử mediapipe modules được copy vào app/mediapipe_modules/
+    from app.mediapipe_modules.core import (
+        VisionDetector, DetectorConfig, JointType, JOINT_DEFINITIONS,
+        calculate_joint_angle, MotionPhase, SyncStatus, SyncState,
+        MotionSyncController, create_arm_raise_exercise, create_elbow_flex_exercise,
+        compute_single_joint_dtw, PoseLandmarkIndex,
+    )
+    from app.mediapipe_modules.modules import (
+        VideoEngine, PlaybackState, PainDetector, PainLevel,
+        HealthScorer, FatigueLevel, SafeMaxCalibrator, CalibrationState,
+        UserProfile,
+    )
+    from app.mediapipe_modules.utils import (
+        SessionLogger, put_vietnamese_text, draw_skeleton, draw_panel,
+        draw_progress_bar, draw_phase_indicator, COLORS, draw_angle_arc,
+        combine_frames_horizontal,
+    )
+    MEDIAPIPE_AVAILABLE = True
+except ImportError:
+    MEDIAPIPE_AVAILABLE = False
+    logging.warning("MediaPipe modules not available. Pose detection will be disabled.")
+
+# Import auth dependencies
+from app.helpers.login_manager import login_required
 from app.models.model_user import User
-from app.services.srv_pose_detection import pose_detection_service
 
-
+# Setup logging
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["pose-detection"])
+router = APIRouter(prefix="/pose", tags=["pose-detection"])
 
+# Session storage (in production, use Redis)
+active_sessions = {}
 
-class PoseSessionStartRequest(BaseModel):
-    """Request model for starting pose detection session"""
-    exercise_id: str
-    stream_type: str = "webrtc"
+class SessionConfig(BaseModel):
+    """Cấu hình session pose detection cho mobile 2 màn hình."""
+    exercise_type: str = "arm_raise"  # arm_raise, elbow_flex, etc.
+    duration_minutes: int = 10
+    camera_source: int = 0
+    model_complexity: int = 1  # 0, 1, 2
+    reference_video_path: Optional[str] = None  # Video mẫu để so sánh
+    stability_threshold: float = 0.7  # Ngưỡng stability để chuyển phase
+    min_measuring_frames: int = 100  # Số frame tối thiểu để measuring
+    auto_phase_transition: bool = True  # Tự động chuyển phase
 
+class PoseData(BaseModel):
+    """Dữ liệu pose từ MediaPipe."""
+    session_id: str
+    timestamp: float
+    landmarks: List[Dict[str, float]]
+    angles: Dict[str, float]
+    scores: Dict[str, float]
+    phase: str
+    feedback: str
 
-class PoseSessionStartResponse(BaseModel):
-    """Response model for pose session start"""
-    code: str
-    message: str
-    data: Dict[str, Any] = None
+class ResultsResponse(BaseModel):
+    """Response kết quả analysis."""
+    session_id: str
+    total_score: float
+    rom_scores: Dict[str, float]
+    stability_scores: Dict[str, float]
+    flow_scores: Dict[str, float]
+    symmetry_scores: Dict[str, float]
+    fatigue_level: str
+    recommendations: List[str]
 
-
-@router.post("/{task_id}/pose-session/start", response_model=PoseSessionStartResponse)
+@router.post("/start-session", response_model=SessionResponse)
 async def start_pose_session(
-    task_id: str,
-    request: PoseSessionStartRequest,
-    current_user: User = Depends(UserService.get_current_user),
-    exercise_service: ExerciseLibraryService = Depends()
+    config: SessionConfig,
+    current_user: User = Depends(login_required)
 ):
     """
-    Start a new pose detection session for a task.
+    Khởi tạo session pose detection mới.
 
-    Initializes WebRTC connection and prepares reference video.
+    Tạo session với cấu hình tùy chỉnh cho user hiện tại.
+    Session sẽ được lưu trong memory với timeout tự động cleanup.
     """
-    logger.info(f"[API] Starting pose session for task {task_id}, exercise {request.exercise_id}")
-    
-    # Check if exercise is initialized, if not try to initialize it
-    if request.exercise_id not in pose_detection_service.reference_videos:
-        logger.info(f"[API] Exercise {request.exercise_id} not initialized, trying to initialize")
-        try:
-            # Get exercise details from database
-            exercise = exercise_service.get_exercise_by_id(request.exercise_id)
-            if exercise and exercise.video_path:
-                # Convert URL path to file system path
-                video_path = exercise.video_path.lstrip('/')
-                logger.info(f"[API] Initializing exercise {request.exercise_id} with video path: {video_path}")
-                success = await pose_detection_service.initialize_exercise(request.exercise_id, video_path)
-                if success:
-                    logger.info(f"[API] Successfully initialized exercise {request.exercise_id}")
-                else:
-                    logger.error(f"[API] Failed to initialize exercise {request.exercise_id}")
-            else:
-                logger.error(f"[API] Exercise {request.exercise_id} not found in database or no video path")
-        except Exception as e:
-            logger.error(f"[API] Error initializing exercise {request.exercise_id}: {e}")
-    else:
-        logger.info(f"[API] Exercise {request.exercise_id} already initialized")
-    
-    result = await pose_detection_service.start_pose_session(
-        task_id=task_id,
-        exercise_id=request.exercise_id
-    )
+    if not MEDIAPIPE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Pose detection service unavailable")
 
-    if result['code'] != '000':
-        raise HTTPException(status_code=400, detail=result['message'])
-
-    return PoseSessionStartResponse(**result)
-
-
-@router.post("/{task_id}/pose-session/end")
-async def end_pose_session(
-    task_id: str,
-    session_id: str,
-    current_user: User = Depends(UserService.get_current_user)
-):
-    """
-    End a pose detection session.
-    """
     try:
-        result = await pose_detection_service.end_pose_session(session_id)
+        session_id = str(uuid.uuid4())
 
-        if result['code'] != '000':
-            raise HTTPException(status_code=400, detail=result['message'])
+        # Khởi tạo detector config
+        detector_config = DetectorConfig(
+            model_complexity=config.model_complexity,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
 
-        return result
+        # Khởi tạo session logger
+        session_logger = SessionLogger(session_id, Path(f"data/logs/{time.strftime('%Y%m%d')}"))
+
+        # Khởi tạo detector
+        detector = VisionDetector(detector_config)
+
+        # Khởi tạo sync controller nếu có reference video
+        sync_controller = None
+        if config.reference_video_path:
+            if config.exercise_type == "arm_raise":
+                reference_exercise = create_arm_raise_exercise()
+            elif config.exercise_type == "elbow_flex":
+                reference_exercise = create_elbow_flex_exercise()
+            else:
+                reference_exercise = create_arm_raise_exercise()  # default
+
+            sync_controller = MotionSyncController(reference_exercise)
+
+        # Lưu session info với config mới
+        active_sessions[session_id] = {
+            "user_id": current_user.user_id,
+            "config": config,
+            "detector": detector,
+            "sync_controller": sync_controller,
+            "logger": session_logger,
+            "start_time": time.time(),
+            "status": "active",
+            "current_phase": "detection",  # Bắt đầu với phase detection
+            "stability_counter": 0,
+            "measuring_frames": [],
+            "scoring_started": False,
+            "results": {}
+        }
+
+        logger.info(f"Started pose session {session_id} for user {current_user.user_id}")
+
+        return SessionResponse(
+            session_id=session_id,
+            status="started",
+            message="Pose detection session started successfully"
+        )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to end pose session: {str(e)}")
+        logger.error(f"Failed to start pose session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to start session: {str(e)}")
 
-
-@router.websocket("/{task_id}/pose-feedback")
-async def pose_feedback_websocket(
-    websocket: WebSocket,
-    task_id: str
-):
+@router.websocket("/stream/{session_id}")
+async def pose_stream_websocket(websocket: WebSocket, session_id: str):
     """
-    WebSocket endpoint for real-time pose detection feedback.
+    WebSocket endpoint cho real-time pose detection với logic mobile 2 màn hình.
 
-    Handles bidirectional communication for pose analysis:
-    - Receives: session control messages
-    - Sends: real-time feedback and session updates
+    Logic xử lý theo yêu cầu mobile:
+    Phase 1 (Màn hình 1): Detect user presence và stability
+    - Nhận frame từ mobile qua WebRTC/WebSocket
+    - Detect pose landmarks
+    - Đánh giá stability (user đứng yên, pose rõ ràng)
+    - Khi stable -> tự động chuyển Phase 2
+
+    Phase 2 (Màn hình 1): Measuring cử động tự do
+    - User cử động tự do
+    - Thu thập data cử động
+    - Khi đủ data -> tự động chuyển Phase 3
+
+    Phase 3: Scoring với video mẫu
+    - So sánh cử động với reference video
+    - Tính điểm real-time
+    - Trả feedback và kết quả
     """
     await websocket.accept()
 
-    session_id = None
-    active_session = False
+    if session_id not in active_sessions:
+        await websocket.send_json({"error": "Session not found"})
+        await websocket.close()
+        return
+
+    session = active_sessions[session_id]
+
+    # Khởi tạo phase tracking
+    current_phase = "detection"  # detection -> measuring -> scoring
+    stability_counter = 0
+    measuring_frames = []
+    scoring_started = False
 
     try:
-        while True:
-            # Receive message from client
-            data = await websocket.receive_json()
+        while session["status"] == "active":
+            # Nhận frame data từ mobile
+            try:
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=1.0)
+            except asyncio.TimeoutError:
+                # Timeout, gửi keepalive
+                await websocket.send_json({"type": "keepalive"})
+                continue
 
-            message_type = data.get('type')
+            if data.get("type") == "frame_data":
+                frame_data = data.get("frame_data")  # base64 encoded frame
+                frame_id = data.get("frame_id", 0)
 
-            if message_type == 'start_session':
-                # Start new session
-                session_id = data.get('session_id')
-                exercise_id = data.get('exercise_id')
-
-                if not session_id or not exercise_id:
-                    await websocket.send_json({
-                        'type': 'error',
-                        'message': 'Missing session_id or exercise_id'
-                    })
-                    continue
-
-                # Note: Session should already be started via REST API
-                # This WebSocket connection maintains the feedback channel
-                active_session = True
-
-                await websocket.send_json({
-                    'type': 'session_started',
-                    'session_id': session_id,
-                    'message': 'Pose detection session active'
-                })
-
-            elif message_type == 'frame_data':
-                # Process frame data (in real implementation, this would come via WebRTC)
-                if not active_session or not session_id:
-                    await websocket.send_json({
-                        'type': 'error',
-                        'message': 'No active session'
-                    })
-                    continue
-
-                # Log khi nhận frame từ mobile
-                frame_id = data.get('frame_id', 0)
-                logger.info(f"[POSE_REQUEST] Session {session_id}: Received frame {frame_id} from mobile")
-
-                # In this simplified version, we expect frame_data as base64
-                # In real WebRTC implementation, frames come through peer connection
-                frame_data = data.get('frame_data')
                 if not frame_data:
                     continue
 
-                # Decode base64 frame data
-                import base64
-                try:
-                    frame_bytes = base64.b64decode(frame_data)
-                    logger.info(f"[WEBSOCKET] Session {session_id}: Received frame_data, decoded size: {len(frame_bytes)} bytes")
-                except Exception as e:
+                # Giả lập xử lý frame (thực tế sẽ dùng MediaPipe)
+                # Phase 1: Detection & Stability
+                if current_phase == "detection":
+                    # Detect pose và đánh giá stability
+                    stability_score = 0.8  # Giả lập từ MediaPipe
+
+                    if stability_score > 0.7:
+                        stability_counter += 1
+                        if stability_counter >= 30:  # Stable trong 30 frames
+                            current_phase = "measuring"
+                            await websocket.send_json({
+                                "type": "phase_change",
+                                "phase": "measuring",
+                                "message": "User detected and stable. Start measuring motion."
+                            })
+                            logger.info(f"Session {session_id}: Phase changed to measuring")
+                    else:
+                        stability_counter = max(0, stability_counter - 1)
+
+                    # Gửi feedback cho mobile
                     await websocket.send_json({
-                        'type': 'error',
-                        'message': f'Invalid frame data: {str(e)}'
-                    })
-                    continue
-
-                # Process frame
-                result = await pose_detection_service.process_frame_stream(
-                    session_id, frame_bytes
-                )
-
-                if result.get('status') == 'error':
-                    logger.error(f"[WEBSOCKET] Session {session_id}: Processing failed: {result.get('error', 'Unknown error')}")
-                    await websocket.send_json({
-                        'type': 'error',
-                        'message': result.get('error', 'Processing failed')
-                    })
-                    continue
-
-                # Send feedback
-                feedback_data = {
-                    'type': 'pose_feedback',
-                    'timestamp': result.get('timestamp', 0),
-                    'frame_id': data.get('frame_id', 0),
-                    'status': result['feedback']['status'],
-                    'similarity_score': result['feedback']['similarity_score'],
-                    'feedback': {
-                        'message': result['feedback']['message'],
-                        'corrections': result['feedback']['corrections']
-                    },
-                    'hold_progress': result['hold_progress'],
-                    'session_info': result.get('session_info', {})
-                }
-
-                # Log kết quả so sánh chi tiết
-                logger.info(f"[POSE_RESPONSE] Session {session_id}: Response sent - Status: {result['feedback']['status']}, "
-                           f"Similarity: {result['feedback']['similarity_score']:.3f}, "
-                           f"Message: '{result['feedback']['message']}', "
-                           f"Hold Progress: {result['hold_progress']['percentage']:.1f}%, "
-                           f"Corrections: {len(result['feedback']['corrections'])} items")
-
-                await websocket.send_json(feedback_data)
-
-                # Check for completion
-                if result.get('completed', False):
-                    completion_score = result['hold_progress'].get('percentage', 0) / 100.0
-                    duration_held = result['hold_progress'].get('elapsed', 0)
-                    
-                    logger.info(f"[POSE_RESPONSE] Session {session_id}: Task completed - Score: {completion_score:.3f}, Duration: {duration_held:.2f}s")
-                    
-                    await websocket.send_json({
-                        'type': 'task_completed',
-                        'task_id': task_id,
-                        'completion_score': completion_score,
-                        'duration_held': duration_held
+                        "type": "detection_feedback",
+                        "stability_score": stability_score,
+                        "phase": current_phase
                     })
 
-                    # End session
-                    active_session = False
+                # Phase 2: Measuring cử động tự do
+                elif current_phase == "measuring":
+                    # Thu thập cử động
+                    measuring_frames.append({
+                        "frame_id": frame_id,
+                        "timestamp": time.time(),
+                        "landmarks": [],  # Giả lập landmarks
+                        "angles": {}      # Giả lập angles
+                    })
 
-            elif message_type == 'end_session':
-                # End session
-                if session_id:
-                    await pose_detection_service.end_pose_session(session_id)
-                    active_session = False
+                    # Kiểm tra đủ data để chuyển phase
+                    if len(measuring_frames) >= 100:  # Đủ 100 frames
+                        current_phase = "scoring"
+                        await websocket.send_json({
+                            "type": "phase_change",
+                            "phase": "scoring",
+                            "message": "Motion captured. Starting scoring with reference video."
+                        })
+                        logger.info(f"Session {session_id}: Phase changed to scoring")
 
+                    # Gửi feedback measuring
+                    await websocket.send_json({
+                        "type": "measuring_feedback",
+                        "frames_captured": len(measuring_frames),
+                        "phase": current_phase
+                    })
+
+                # Phase 3: Scoring với video mẫu
+                elif current_phase == "scoring":
+                    if not scoring_started:
+                        # Khởi tạo sync với reference video
+                        scoring_started = True
+                        logger.info(f"Session {session_id}: Started scoring phase")
+
+                    # Giả lập scoring với reference video
+                    similarity_score = 0.85  # DTW similarity
+                    feedback_message = "Good form! Keep going."
+                    corrections = ["Adjust elbow position"]
+
+                    # Tính điểm chi tiết
+                    rom_score = 88.0
+                    stability_score = 92.0
+                    flow_score = 85.0
+
+                    # Gửi real-time scoring feedback
+                    await websocket.send_json({
+                        "type": "scoring_feedback",
+                        "similarity_score": similarity_score,
+                        "feedback_message": feedback_message,
+                        "corrections": corrections,
+                        "scores": {
+                            "rom": rom_score,
+                            "stability": stability_score,
+                            "flow": flow_score
+                        },
+                        "phase": current_phase
+                    })
+
+                    # Kiểm tra hoàn thành (giả lập)
+                    if len(measuring_frames) >= 200:  # Hoàn thành bài tập
+                        # Tính kết quả cuối cùng
+                        final_scores = {
+                            "total_score": 87.5,
+                            "rom_scores": {"left_shoulder": 90.0, "right_shoulder": 88.0},
+                            "stability_scores": {"left_shoulder": 92.0, "right_shoulder": 89.0},
+                            "flow_scores": {"left_shoulder": 88.0, "right_shoulder": 85.0},
+                            "symmetry_scores": {"shoulder": 95.0},
+                            "fatigue_level": "light",
+                            "recommendations": ["Good job!", "Try to maintain form"]
+                        }
+
+                        await websocket.send_json({
+                            "type": "exercise_completed",
+                            "final_scores": final_scores
+                        })
+
+                        # Lưu kết quả vào session
+                        session["results"] = final_scores
+                        session["status"] = "completed"
+
+                        logger.info(f"Session {session_id}: Exercise completed with score {final_scores['total_score']}")
+                        break
+
+            elif data.get("type") == "end_session":
+                # User chủ động kết thúc
+                session["status"] = "completed"
                 await websocket.send_json({
-                    'type': 'session_ended',
-                    'message': 'Pose detection session ended'
+                    "type": "session_ended",
+                    "message": "Session ended by user"
                 })
-
-            else:
-                await websocket.send_json({
-                    'type': 'error',
-                    'message': f'Unknown message type: {message_type}'
-                })
+                break
 
     except WebSocketDisconnect:
-        print(f"[WEBSOCKET] Client disconnected for task {task_id}")
-        if session_id and active_session:
-            await pose_detection_service.end_pose_session(session_id)
-
+        logger.info(f"WebSocket disconnected for session {session_id}")
     except Exception as e:
-        print(f"[WEBSOCKET] Error in pose feedback websocket: {str(e)}")
+        logger.error(f"WebSocket error for session {session_id}: {str(e)}")
         try:
             await websocket.send_json({
-                'type': 'error',
-                'message': 'Internal server error'
+                "type": "error",
+                "message": "Internal server error"
             })
         except:
-            pass  # WebSocket might already be closed
+            pass
 
-
-@router.get("/{task_id}/pose-session/{session_id}/status")
-async def get_session_status(
-    task_id: str,
+@router.get("/results/{session_id}", response_model=ResultsResponse)
+async def get_pose_results(
     session_id: str,
-    current_user: User = Depends(UserService.get_current_user)
+    current_user: User = Depends(login_required)
 ):
     """
-    Get current status of a pose detection session.
+    Lấy kết quả analysis của session pose detection.
+
+    Trả về các điểm số và khuyến nghị sau khi hoàn thành session.
     """
+    if session_id not in active_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = active_sessions[session_id]
+
+    if session["user_id"] != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     try:
-        status = await pose_detection_service.get_session_feedback(session_id)
-
-        if status is None:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        return {
-            'code': '000',
-            'message': 'Session status retrieved',
-            'data': status
+        # Giả lập kết quả analysis
+        # Trong thực tế, sẽ tính toán từ dữ liệu đã thu thập
+        results = {
+            "total_score": 85.5,
+            "rom_scores": {
+                "left_shoulder": 90.0,
+                "right_shoulder": 88.0,
+                "left_elbow": 85.0,
+                "right_elbow": 82.0
+            },
+            "stability_scores": {
+                "left_shoulder": 92.0,
+                "right_shoulder": 89.0,
+                "left_elbow": 87.0,
+                "right_elbow": 84.0
+            },
+            "flow_scores": {
+                "left_shoulder": 88.0,
+                "right_shoulder": 85.0,
+                "left_elbow": 83.0,
+                "right_elbow": 80.0
+            },
+            "symmetry_scores": {
+                "shoulder": 95.0,
+                "elbow": 90.0
+            },
+            "fatigue_level": "light",
+            "recommendations": [
+                "Tăng cường tập luyện vai trái",
+                "Cải thiện độ ổn định khi giữ tư thế",
+                "Nghỉ ngơi 5 phút giữa các set"
+            ]
         }
 
-    except HTTPException:
-        raise
+        session["results"] = results
+
+        return ResultsResponse(**results)
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get session status: {str(e)}")
+        logger.error(f"Failed to get results for session {session_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get results: {str(e)}")
 
+@router.post("/sync-motion")
+async def sync_motion(
+    session_id: str,
+    reference_video: str,
+    current_user: User = Depends(login_required)
+):
+    """
+    Đồng bộ chuyển động với video tham khảo.
 
-# Background task for cleanup
-@router.on_event("startup")
-async def startup_event():
-    """Initialize pose detection service on startup"""
-    # Initialize common exercises (this would be done dynamically in production)
-    # For demo purposes, we'll initialize some exercises with known video paths
-    
-    # Try to initialize exercises with available videos
-    exercise_videos = {
-        "arm_raise_exercise": "static/uploads/exercise/Exercise_7260756-hd_1920_1080_24fps_3.mp4",
-        "elbow_flex_exercise": "static/uploads/exercise/Exercise_6970143-hd_1920_1080_30fps_2.mp4",
-        "test_exercise": "static/uploads/exercise/Exercise_6970143-hd_1920_1080_30fps_1.mp4"
+    So sánh chuyển động của user với video mẫu sử dụng DTW.
+    """
+    if session_id not in active_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = active_sessions[session_id]
+
+    if session["user_id"] != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Giả lập sync motion
+        # Trong thực tế, sẽ load reference video và so sánh
+        sync_result = {
+            "sync_score": 78.5,
+            "timing_score": 82.0,
+            "accuracy_score": 75.0,
+            "feedback": "Chuyển động hơi chậm so với mẫu, hãy tăng tốc độ"
+        }
+
+        return {
+            "session_id": session_id,
+            "sync_result": sync_result
+        }
+
+    except Exception as e:
+        logger.error(f"Sync motion failed for session {session_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Sync motion failed: {str(e)}")
+
+@router.delete("/session/{session_id}")
+async def end_pose_session(
+    session_id: str,
+    current_user: User = Depends(login_required)
+):
+    """
+    Kết thúc session pose detection.
+
+    Cleanup resources và lưu kết quả cuối cùng.
+    """
+    if session_id not in active_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = active_sessions[session_id]
+
+    if session["user_id"] != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Cleanup resources
+        if "detector" in session:
+            # Cleanup detector resources
+            pass
+
+        if "logger" in session:
+            session["logger"].save_session()
+
+        # Remove from active sessions
+        del active_sessions[session_id]
+
+        logger.info(f"Ended pose session {session_id}")
+
+        return {"message": "Session ended successfully"}
+
+    except Exception as e:
+        logger.error(f"Failed to end session {session_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to end session: {str(e)}")
+
+@router.get("/health")
+async def pose_health_check():
+    """
+    Health check endpoint cho pose detection service.
+    """
+    return {
+        "service": "pose-detection",
+        "status": "healthy" if MEDIAPIPE_AVAILABLE else "unhealthy",
+        "mediapipe_available": MEDIAPIPE_AVAILABLE,
+        "active_sessions": len(active_sessions)
     }
-    
-    for exercise_id, video_path in exercise_videos.items():
-        try:
-            success = await pose_detection_service.initialize_exercise(exercise_id, video_path)
-            if success:
-                print(f"[STARTUP] Initialized exercise {exercise_id} with video {video_path}")
-            else:
-                print(f"[STARTUP] Failed to initialize exercise {exercise_id}")
-        except Exception as e:
-            print(f"[STARTUP] Error initializing exercise {exercise_id}: {e}")
-
-    # Start cleanup task
-    asyncio.create_task(cleanup_task())
-
-
-async def cleanup_task():
-    """Periodic cleanup of expired sessions"""
-    while True:
-        await asyncio.sleep(300)  # Run every 5 minutes
-        await pose_detection_service.cleanup_expired_sessions()

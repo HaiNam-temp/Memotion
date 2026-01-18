@@ -8,22 +8,27 @@ Handles pose detection processing without webcam dependencies.
 import asyncio
 import time
 import numpy as np
-import cv2
+# import cv2  # Temporarily disabled due to dependency issues
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..mediapipe_integration.core import (
-    VisionDetector, DetectorConfig, JointType, JOINT_DEFINITIONS,
-    calculate_joint_angle, MotionPhase, SyncStatus, SyncState,
-    MotionSyncController, create_arm_raise_exercise, create_elbow_flex_exercise,
-    compute_single_joint_dtw,
-)
-from ..mediapipe_integration.modules import (
-    VideoEngine, PlaybackState, PainDetector, PainLevel,
-    HealthScorer, FatigueLevel,
-)
-from ..mediapipe_integration.utils import SessionLogger
+# Temporarily disable pose detection imports
+# from ..mediapipe_integration.core import (
+#     VisionDetector, DetectorConfig, JointType, JOINT_DEFINITIONS,
+#     calculate_joint_angle, MotionPhase, SyncStatus, SyncState,
+# Temporarily disable pose detection imports
+# from ..mediapipe_integration.core import (
+#     VisionDetector, DetectorConfig, JointType, JOINT_DEFINITIONS,
+#     calculate_joint_angle, MotionPhase, SyncStatus, SyncState,
+#     MotionSyncController, create_arm_raise_exercise, create_elbow_flex_exercise,
+#     compute_single_joint_dtw,
+# )
+# from ..mediapipe_integration.modules import (
+#     VideoEngine, PlaybackState, PainDetector, PainLevel,
+#     HealthScorer, FatigueLevel,
+# )
+# from ..mediapipe_integration.utils import SessionLogger
 
 
 @dataclass
@@ -53,12 +58,26 @@ class PoseDetectionAgent:
     Integrates with backend services for WebRTC/WebSocket communication.
     """
 
-    def __init__(self, config: Optional[DetectorConfig] = None):
-        self.config = config or DetectorConfig()
-        self.detector = VisionDetector(self.config)
-        self.reference_poses: Dict[str, Any] = {}  # Cache for reference poses
-        self.active_sessions: Dict[str, Dict[str, Any]] = {}
-        self.logger = SessionLogger("./data/logs")
+    def __init__(self, config: Optional[Dict] = None):
+        # Check if pose detection dependencies are available
+        self.dependencies_available = False
+        try:
+            import cv2
+            # Add other imports here if needed
+            self.dependencies_available = True
+        except ImportError:
+            self.dependencies_available = False
+
+        if not self.dependencies_available:
+            print("Warning: Pose detection dependencies not available. Functionality disabled.")
+            return
+
+        # Original initialization code (commented out)
+        # self.config = config or DetectorConfig()
+        # self.detector = VisionDetector(self.config)
+        # self.reference_poses: Dict[str, Any] = {}  # Cache for reference poses
+        # self.active_sessions: Dict[str, Dict[str, Any]] = {}
+        # self.logger = SessionLogger("./data/logs")
 
     def load_reference_video(self, exercise_id: str, video_path: str) -> bool:
         """
@@ -71,27 +90,39 @@ class PoseDetectionAgent:
         Returns:
             bool: True if loaded successfully
         """
-        try:
-            if exercise_id in self.reference_poses:
-                return True  # Already cached
+        if not self.dependencies_available:
+            print(f"Pose detection unavailable: Cannot load reference video for {exercise_id}")
+            return False
 
-            video_engine = VideoEngine(video_path)
-            total_frames = video_engine.total_frames
-            fps = video_engine.fps
+        # Original code commented out
+        # try:
+        #     if exercise_id in self.reference_poses:
+        #         return True  # Already cached
+        #
+        #     video_engine = VideoEngine(video_path)
+        #     total_frames = video_engine.total_frames
+        #     fps = video_engine.fps
+        #
+        #     # Determine exercise type based on video analysis
+        #     # For now, assume arm raise exercise
+        #     exercise = create_arm_raise_exercise(total_frames, fps, max_angle=150)
+        #
+        #     self.reference_poses[exercise_id] = {
+        #         'video_engine': video_engine,
+        #         'exercise': exercise,
+        #         'sync_controller': MotionSyncController(exercise),
+        #         'checkpoints': [cp.frame_index for cp in exercise.checkpoints]
+        #     }
+        #
+        #     video_engine.set_checkpoints(self.reference_poses[exercise_id]['checkpoints'])
+        #     video_engine.set_speed(0.7)
+        #
+        #     return True
+        # except Exception as e:
+        #     print(f"Error loading reference video: {e}")
+        #     return False
 
-            # Determine exercise type based on video analysis
-            # For now, assume arm raise exercise
-            exercise = create_arm_raise_exercise(total_frames, fps, max_angle=150)
-
-            self.reference_poses[exercise_id] = {
-                'video_engine': video_engine,
-                'exercise': exercise,
-                'sync_controller': MotionSyncController(exercise),
-                'checkpoints': [cp.frame_index for cp in exercise.checkpoints]
-            }
-
-            video_engine.set_checkpoints(self.reference_poses[exercise_id]['checkpoints'])
-            video_engine.set_speed(0.7)
+        return False  # Placeholder when dependencies unavailable
 
             return True
         except Exception as e:

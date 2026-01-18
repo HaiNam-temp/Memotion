@@ -32,7 +32,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./static:/app/static
+      - /home/hieuvu/static:/app/static
     networks:
       - memotion-network
 

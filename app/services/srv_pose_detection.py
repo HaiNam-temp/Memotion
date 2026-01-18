@@ -28,6 +28,7 @@ class PoseDetectionService:
     def __init__(self):
         self.agent = PoseDetectionAgent()
         self.active_sessions: Dict[str, Dict[str, Any]] = {}
+        self.dependencies_available = self.agent.dependencies_available if hasattr(self.agent, 'dependencies_available') else False
         self.reference_videos: Dict[str, str] = {}  # exercise_id -> video_path
 
     async def initialize_exercise(self, exercise_id: str, video_path: str) -> bool:

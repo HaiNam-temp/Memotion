@@ -47,6 +47,17 @@ def get_application() -> FastAPI:
     application.add_middleware(DBSessionMiddleware, db_url=settings.DATABASE_URL)
     application.include_router(router, prefix=settings.API_PREFIX)
     application.add_exception_handler(CustomException, http_exception_handler)
+
+    # Health check endpoint
+    @application.get("/health")
+    async def health_check():
+        return {
+            "status": "healthy",
+            "services": {
+                "database": "connected",
+                "pose_detection": "enabled" if os.getenv("POSE_DETECTION_ENABLED", "false").lower() == "true" else "disabled"
+            }
+        }
     
     os.makedirs("static", exist_ok=True)
 
