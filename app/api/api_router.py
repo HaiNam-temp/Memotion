@@ -15,4 +15,5 @@ router.include_router(api_nutrition_library.router, tags=["nutrition-library"], 
 router.include_router(api_medication_library.router, tags=["medication-library"], prefix="/medication-library")
 router.include_router(api_exercise_library.router, tags=["exercise-library"], prefix="/exercise-library")
 router.include_router(api_notification.router, tags=["notification"], prefix="/notifications")
-router.include_router(api_pose_detection.router, tags=["pose-detection"], prefix="/api")
+router.include_router(api_pose_detection.router, tags=["pose-detection"], prefix="/pose")
+router.include_router(api_pose_detection.task_router, tags=["task-pose-detection"])

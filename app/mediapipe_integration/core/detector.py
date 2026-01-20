@@ -19,13 +19,10 @@ try:
     from mediapipe.tasks.python import vision as mp_vision
 except ImportError as e:
     raise ImportError(
-        "MediaPipe Tasks API not found. Install with: pip install mediapipe"
+        "MediaPipe not found. Install with: pip install mediapipe"
     ) from e
 
 from .data_types import (
-    Point3D,
-    LandmarkSet,
-    LandmarkType,
     DetectionResult,
 )
 
@@ -46,7 +43,7 @@ class DetectorConfig:
         num_faces: Số lượng khuôn mặt tối đa detect.
         running_mode: Chế độ chạy (IMAGE, VIDEO, LIVE_STREAM).
     """
-    pose_model_path: Optional[str] = None
+    pose_model_path: Optional[str] = "app/mediapipe_models/pose_landmarker_lite.task"
     face_model_path: Optional[str] = None
     min_pose_detection_confidence: float = 0.5
     min_pose_tracking_confidence: float = 0.5
@@ -104,19 +101,16 @@ class VisionDetector:
         )
     
     def _init_pose_landmarker(self) -> None:
-        """Khởi tạo Pose Landmarker nếu có model path."""
-        if self._config.pose_model_path is None:
-            return
-            
-        model_path = Path(self._config.pose_model_path)
-        if not model_path.exists():
-            raise FileNotFoundError(
-                f"Pose model not found: {self._config.pose_model_path}"
-            )
-        
-        base_options = mp_tasks.BaseOptions(
-            model_asset_path=str(model_path)
-        )
+        """Khởi tạo Pose Landmarker với built-in model."""
+        base_options = mp_tasks.BaseOptions()  # Use built-in model
+        if self._config.pose_model_path is not None:
+            model_path = Path(self._config.pose_model_path)
+            if model_path.exists():
+                base_options = mp_tasks.BaseOptions(
+                    model_asset_path=str(model_path)
+                )
+            else:
+                print(f"Warning: Pose model not found: {self._config.pose_model_path}, using built-in model")
         
         options = mp_vision.PoseLandmarkerOptions(
             base_options=base_options,
@@ -127,6 +121,8 @@ class VisionDetector:
             min_tracking_confidence=self._config.min_pose_tracking_confidence,
             output_segmentation_masks=False,
         )
+        
+        self._pose_landmarker = mp_vision.PoseLandmarker.create_from_options(options)
         
         self._pose_landmarker = mp_vision.PoseLandmarker.create_from_options(options)
     
@@ -158,39 +154,7 @@ class VisionDetector:
         
         self._face_landmarker = mp_vision.FaceLandmarker.create_from_options(options)
     
-    def _convert_landmarks_to_set(
-        self,
-        landmarks,
-        landmark_type: LandmarkType,
-        timestamp_ms: int
-    ) -> LandmarkSet:
-        """
-        Chuyển đổi MediaPipe landmarks sang LandmarkSet.
-        
-        Args:
-            landmarks: MediaPipe NormalizedLandmarkList hoặc tương tự.
-            landmark_type: Loại landmark.
-            timestamp_ms: Timestamp của frame.
-            
-        Returns:
-            LandmarkSet chứa các Point3D.
-        """
-        points = []
-        for lm in landmarks:
-            point = Point3D(
-                x=lm.x,
-                y=lm.y,
-                z=lm.z,
-                visibility=getattr(lm, 'visibility', None),
-                presence=getattr(lm, 'presence', None),
-            )
-            points.append(point)
-        
-        return LandmarkSet(
-            landmarks=points,
-            landmark_type=landmark_type,
-            timestamp_ms=timestamp_ms,
-        )
+
     
     def process_frame(
         self,
@@ -214,10 +178,7 @@ class VisionDetector:
             - World landmarks có đơn vị meters với gốc tại hip center.
         """
         if image is None or image.size == 0:
-            return DetectionResult(
-                is_valid=False,
-                error_message="Invalid input image"
-            )
+            return DetectionResult()
         
         # Auto timestamp nếu không được cung cấp
         if timestamp_ms is None:
@@ -231,10 +192,7 @@ class VisionDetector:
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
         
         result = DetectionResult(
-            frame_width=frame_width,
-            frame_height=frame_height,
             timestamp_ms=timestamp_ms,
-            is_valid=True,
         )
         
         # Process Pose
@@ -245,22 +203,13 @@ class VisionDetector:
                 )
                 
                 if pose_result.pose_landmarks and len(pose_result.pose_landmarks) > 0:
-                    # Lấy pose đầu tiên (person đầu tiên)
-                    result.pose_landmarks = self._convert_landmarks_to_set(
-                        pose_result.pose_landmarks[0],
-                        LandmarkType.POSE,
-                        timestamp_ms
-                    )
+                    result.pose_landmarks = pose_result.pose_landmarks[0]
                     
                     # World landmarks (real-world 3D coordinates)
                     if pose_result.pose_world_landmarks and len(pose_result.pose_world_landmarks) > 0:
-                        result.pose_world_landmarks = self._convert_landmarks_to_set(
-                            pose_result.pose_world_landmarks[0],
-                            LandmarkType.POSE,
-                            timestamp_ms
-                        )
+                        result.pose_world_landmarks = pose_result.pose_world_landmarks[0]
             except Exception as e:
-                result.error_message = f"Pose detection error: {str(e)}"
+                print(f"Pose detection error: {str(e)}")
         
         # Process Face
         if self._face_landmarker is not None:
@@ -270,22 +219,9 @@ class VisionDetector:
                 )
                 
                 if face_result.face_landmarks and len(face_result.face_landmarks) > 0:
-                    result.face_landmarks = self._convert_landmarks_to_set(
-                        face_result.face_landmarks[0],
-                        LandmarkType.FACE,
-                        timestamp_ms
-                    )
+                    result.face_landmarks = face_result.face_landmarks[0]
             except Exception as e:
-                if result.error_message:
-                    result.error_message += f"; Face detection error: {str(e)}"
-                else:
-                    result.error_message = f"Face detection error: {str(e)}"
-        
-        # Đánh dấu valid nếu có ít nhất một detection
-        result.is_valid = result.has_pose() or result.has_face()
-        
-        if not result.is_valid and not result.error_message:
-            result.error_message = "No person detected in frame"
+                print(f"Face detection error: {str(e)}")
         
         return result
     
@@ -302,10 +238,7 @@ class VisionDetector:
             DetectionResult chứa landmarks.
         """
         if image is None or image.size == 0:
-            return DetectionResult(
-                is_valid=False,
-                error_message="Invalid input image"
-            )
+            return DetectionResult()
         
         frame_height, frame_width = image.shape[:2]
         
@@ -313,10 +246,7 @@ class VisionDetector:
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
         
         result = DetectionResult(
-            frame_width=frame_width,
-            frame_height=frame_height,
             timestamp_ms=0,
-            is_valid=True,
         )
         
         if self._pose_landmarker is not None:
@@ -324,38 +254,21 @@ class VisionDetector:
                 pose_result = self._pose_landmarker.detect(mp_image)
                 
                 if pose_result.pose_landmarks and len(pose_result.pose_landmarks) > 0:
-                    result.pose_landmarks = self._convert_landmarks_to_set(
-                        pose_result.pose_landmarks[0],
-                        LandmarkType.POSE,
-                        0
-                    )
+                    result.pose_landmarks = pose_result.pose_landmarks[0]
                     
                     if pose_result.pose_world_landmarks and len(pose_result.pose_world_landmarks) > 0:
-                        result.pose_world_landmarks = self._convert_landmarks_to_set(
-                            pose_result.pose_world_landmarks[0],
-                            LandmarkType.POSE,
-                            0
-                        )
+                        result.pose_world_landmarks = pose_result.pose_world_landmarks[0]
             except Exception as e:
-                result.error_message = f"Pose detection error: {str(e)}"
+                print(f"Pose detection error: {str(e)}")
         
         if self._face_landmarker is not None:
             try:
                 face_result = self._face_landmarker.detect(mp_image)
                 
                 if face_result.face_landmarks and len(face_result.face_landmarks) > 0:
-                    result.face_landmarks = self._convert_landmarks_to_set(
-                        face_result.face_landmarks[0],
-                        LandmarkType.FACE,
-                        0
-                    )
+                    result.face_landmarks = face_result.face_landmarks[0]
             except Exception as e:
-                if result.error_message:
-                    result.error_message += f"; Face detection error: {str(e)}"
-                else:
-                    result.error_message = f"Face detection error: {str(e)}"
-        
-        result.is_valid = result.has_pose() or result.has_face()
+                print(f"Face detection error: {str(e)}")
         
         return result
     

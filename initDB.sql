@@ -300,3 +300,6 @@ ALTER TABLE patient_loneliness
     ADD CONSTRAINT fk_lonely_profile_new
         FOREIGN KEY (profile_id) REFERENCES patient_profile(profile_id)
             ON DELETE CASCADE;
+-- Add is_first_login column to users table
+ALTER TABLE memotion.users 
+ADD COLUMN is_first_login BOOLEAN DEFAULT true NOT NULL;

@@ -2,9 +2,10 @@ import logging
 import os
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi_sqlalchemy import DBSessionMiddleware
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
@@ -16,6 +17,23 @@ from app.helpers.exception_handler import CustomException, http_exception_handle
 from sqlalchemy import text
 
 logging.config.fileConfig(settings.LOGGING_CONFIG_FILE, disable_existing_loggers=False)
+
+# HTTP Request/Response Logging Middleware
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        logger = logging.getLogger(__name__)
+        
+        # Log incoming request
+        logger.info(f"HTTP {request.method} {request.url}")
+        logger.info(f"Headers: {dict(request.headers)}")
+        
+        # Process request
+        response = await call_next(request)
+        
+        # Log response
+        logger.info(f"Response: {response.status_code}")
+        
+        return response
 
 with engine.connect() as connection:
     with connection.begin():
@@ -85,4 +103,5 @@ def get_application() -> FastAPI:
 
 app = get_application()
 if __name__ == '__main__':
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv('PORT', 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

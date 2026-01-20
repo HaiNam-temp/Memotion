@@ -5,7 +5,13 @@ Handles connection to Google Gemini API and message generation.
 import logging
 import os
 from typing import Optional, Dict, Any
-import google.generativeai as genai
+# Temporarily disabled due to package compatibility issues
+try:
+    import google.generativeai as genai
+    GENAI_AVAILABLE = True
+except ImportError:
+    GENAI_AVAILABLE = False
+    genai = None
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -25,6 +31,11 @@ class GeminiClient:
             api_key: Google Gemini API key. If None, reads from environment variable.
             model_name: Gemini model to use (default: gemini-1.5-flash).
         """
+        if not GENAI_AVAILABLE:
+            logger.warning("Google Generative AI not available - Gemini client disabled")
+            self.model = None
+            return
+
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY not found in environment variables")
@@ -36,8 +47,9 @@ class GeminiClient:
 
     def _configure_api(self):
         """Configure Gemini API with API key."""
-        genai.configure(api_key=self.api_key)
-        logger.debug("Gemini API configured successfully")
+        if GENAI_AVAILABLE:
+            genai.configure(api_key=self.api_key)
+            logger.debug("Gemini API configured successfully")
 
     def generate_content(
         self,
@@ -63,6 +75,10 @@ class GeminiClient:
         Raises:
             Exception: If API call fails.
         """
+        if not GENAI_AVAILABLE or self.model is None:
+            logger.warning("Gemini API not available - returning mock response")
+            return f"Mock response for prompt: {prompt[:50]}..."
+
         try:
             generation_config = genai.types.GenerationConfig(
                 temperature=temperature,

@@ -180,3 +180,134 @@ Trả về danh sách các nhiệm vụ của bệnh nhân trong ngày.
 *   **400 Bad Request**: Lỗi định dạng ngày hoặc lỗi hệ thống.
 *   **401 Unauthorized**: Chưa đăng nhập hoặc token hết hạn.
 *   **403 Forbidden**: Người dùng không phải là Patient.
+
+## 4. Patient Profile Management (Quản lý hồ sơ bệnh nhân)
+
+### 4.1. Create Patient General Profile (Tạo hồ sơ tổng quát)
+
+API cho Caretaker tạo hồ sơ tổng quát cho bệnh nhân của mình.
+
+*   **URL**: `/api/patient-profile/general`
+*   **Method**: `POST`
+*   **Headers**:
+    *   `Authorization`: `Bearer <access_token>` (Token của Caretaker)
+
+#### Request Body
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `gender` | string | No | Giới tính: `MALE`, `FEMALE`, `OTHER` |
+| `living_arrangement` | string | No | Môi trường sống |
+| `bmi_score` | number | No | Chỉ số BMI |
+| `map_score` | number | No | Chỉ số MAP (Mean Arterial Pressure) |
+| `rhr_score` | number | No | Chỉ số RHR (Resting Heart Rate) |
+| `adl_score` | number | No | Chỉ số ADL (Activities of Daily Living) |
+| `iadl_score` | number | No | Chỉ số IADL (Instrumental Activities of Daily Living) |
+| `blood_glucose_level` | number | No | Mức đường huyết |
+| `disease_type` | string | **Yes** | Loại bệnh: `PHYSICAL_THERAPY`, `MENTAL_DECLINE`, `LONELINESS` |
+| `condition_note` | string | No | Ghi chú về tình trạng |
+
+#### Response
+
+```json
+{
+  "code": "000",
+  "message": "Thành công",
+  "data": {
+    "profile_id": "uuid",
+    "patient_id": "uuid",
+    "gender": "MALE",
+    "living_arrangement": "string",
+    "bmi_score": 25.5,
+    "map_score": 90.0,
+    "rhr_score": 70.0,
+    "adl_score": 8.0,
+    "iadl_score": 6.0,
+    "blood_glucose_level": 100.0,
+    "disease_type": "PHYSICAL_THERAPY",
+    "condition_note": "string",
+    "created_at": "2023-10-27T10:00:00Z",
+    "updated_at": "2023-10-27T10:00:00Z"
+  }
+}
+```
+
+### 4.2. Get Patient General Profile (Xem hồ sơ tổng quát)
+
+API để xem hồ sơ tổng quát của bệnh nhân.
+
+*   **URL**: `/api/patient-profile/general`
+*   **Method**: `GET`
+*   **Headers**:
+    *   `Authorization`: `Bearer <access_token>`
+
+#### Response
+
+Tương tự như trên.
+
+### 4.3. Update Patient General Profile (Cập nhật hồ sơ tổng quát)
+
+API để cập nhật hồ sơ tổng quát của bệnh nhân.
+
+*   **URL**: `/api/patient-profile/general`
+*   **Method**: `PUT`
+*   **Headers**:
+    *   `Authorization`: `Bearer <access_token>`
+
+#### Request Body
+
+Tương tự Create, nhưng tất cả fields đều optional (partial update).
+
+#### Response
+
+Tương tự như Create.
+
+### 4.4. Delete Patient General Profile (Xóa hồ sơ tổng quát)
+
+API để xóa hồ sơ tổng quát của bệnh nhân.
+
+*   **URL**: `/api/patient-profile/general`
+*   **Method**: `DELETE`
+*   **Headers**:
+    *   `Authorization`: `Bearer <access_token>`
+
+#### Response
+
+```json
+{
+  "code": "000",
+  "message": "Profile deleted successfully",
+  "data": null
+}
+```
+
+#### Error Responses
+
+*   **400 Bad Request**: Hồ sơ không tồn tại hoặc lỗi hệ thống.
+*   **401 Unauthorized**: Chưa đăng nhập hoặc token hết hạn.
+*   **403 Forbidden**: Không có quyền truy cập hồ sơ này.
+
+### 4.5. Delete Patient Physical Therapy Profile (Xóa hồ sơ vật lý trị liệu)
+
+API để xóa hồ sơ vật lý trị liệu của bệnh nhân.
+
+*   **URL**: `/api/patient-profile/physical-therapy`
+*   **Method**: `DELETE`
+*   **Headers**:
+    *   `Authorization`: `Bearer <access_token>`
+
+#### Response
+
+```json
+{
+  "code": "000",
+  "message": "Physical therapy profile deleted successfully",
+  "data": null
+}
+```
+
+#### Error Responses
+
+*   **400 Bad Request**: Hồ sơ không tồn tại hoặc lỗi hệ thống.
+*   **401 Unauthorized**: Chưa đăng nhập hoặc token hết hạn.
+*   **403 Forbidden**: Không có quyền truy cập hồ sơ này.

@@ -1,175 +1,135 @@
 """
-Data Types Module for MEMOTION.
+Data Types Module for MEMOTION MediaPipe Integration.
 
-Chứa các Data Classes và Type Definitions chuẩn hóa
-để dễ dàng chuyển đổi sang Flutter/Dart sau này.
-
-Author: MEMOTION Team
-Version: 1.0.0
+Contains all data classes, enums, and type definitions used across the system.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
-from enum import Enum, auto
+from typing import List, Optional, Dict, Any
+from enum import Enum
 import numpy as np
 
 
-class LandmarkType(Enum):
-    """Enum định nghĩa loại landmark."""
-    POSE = auto()
-    FACE = auto()
-    HAND_LEFT = auto()
-    HAND_RIGHT = auto()
-
-
-@dataclass(frozen=True)
+@dataclass
 class Point3D:
-    """
-    Đại diện một điểm trong không gian 3D.
-    
-    Attributes:
-        x: Tọa độ X (normalized 0-1 hoặc world coordinates).
-        y: Tọa độ Y (normalized 0-1 hoặc world coordinates).
-        z: Tọa độ Z (depth, normalized hoặc world coordinates).
-        visibility: Độ tin cậy của điểm (0-1), None nếu không áp dụng.
-        presence: Xác suất điểm tồn tại trong frame (0-1).
-    """
+    """3D point with x, y, z coordinates."""
     x: float
     y: float
     z: float
     visibility: Optional[float] = None
     presence: Optional[float] = None
-    
-    def to_array(self) -> np.ndarray:
-        """Chuyển đổi sang numpy array [x, y, z]."""
-        return np.array([self.x, self.y, self.z], dtype=np.float32)
-    
-    def to_2d(self) -> Tuple[float, float]:
-        """Lấy tọa độ 2D (x, y)."""
-        return (self.x, self.y)
+
+
+class LandmarkType(Enum):
+    """Types of landmarks."""
+    POSE = "pose"
+    FACE = "face"
+    HAND = "hand"
 
 
 @dataclass
 class LandmarkSet:
-    """
-    Tập hợp các landmarks của một loại (pose/face/hand).
-    
-    Attributes:
-        landmarks: Danh sách các điểm Point3D.
-        landmark_type: Loại landmark (POSE, FACE, etc.).
-        timestamp_ms: Timestamp của frame (milliseconds).
-    """
-    landmarks: List[Point3D]
-    landmark_type: LandmarkType
-    timestamp_ms: int = 0
-    
-    def __len__(self) -> int:
-        return len(self.landmarks)
-    
-    def to_numpy(self) -> np.ndarray:
-        """
-        Chuyển đổi toàn bộ landmarks sang numpy array.
-        
-        Returns:
-            np.ndarray: Ma trận shape (N, 3) với N là số landmarks.
-        """
-        if not self.landmarks:
-            return np.array([], dtype=np.float32).reshape(0, 3)
-        return np.array([lm.to_array() for lm in self.landmarks], dtype=np.float32)
-    
-    def get_visibility_mask(self, threshold: float = 0.5) -> np.ndarray:
-        """
-        Tạo mask cho các landmarks có visibility cao.
-        
-        Args:
-            threshold: Ngưỡng visibility tối thiểu.
-            
-        Returns:
-            np.ndarray: Boolean mask shape (N,).
-        """
-        mask = []
-        for lm in self.landmarks:
-            if lm.visibility is not None:
-                mask.append(lm.visibility >= threshold)
-            else:
-                mask.append(True)
-        return np.array(mask, dtype=bool)
+    """Set of landmarks for a specific type."""
+    landmarks: List[Point3D] = field(default_factory=list)
+    landmark_type: LandmarkType = LandmarkType.POSE
+    visibility: List[float] = field(default_factory=list)
 
 
 @dataclass
 class DetectionResult:
-    """
-    Kết quả detection từ một frame.
-    
-    Attributes:
-        pose_landmarks: Landmarks của pose (33 điểm cho MediaPipe).
-        face_landmarks: Landmarks của khuôn mặt (478 điểm).
-        pose_world_landmarks: Pose landmarks trong world coordinates.
-        frame_width: Chiều rộng frame gốc.
-        frame_height: Chiều cao frame gốc.
-        timestamp_ms: Timestamp của frame.
-        is_valid: True nếu detection thành công.
-        error_message: Thông báo lỗi nếu có.
-    """
-    pose_landmarks: Optional[LandmarkSet] = None
-    face_landmarks: Optional[LandmarkSet] = None
-    pose_world_landmarks: Optional[LandmarkSet] = None
-    frame_width: int = 0
-    frame_height: int = 0
+    """Result of pose/face detection."""
+    pose_landmarks: Optional[Any] = None  # Raw Mediapipe NormalizedLandmarkList
+    pose_world_landmarks: Optional[Any] = None  # Raw Mediapipe NormalizedLandmarkList
+    face_landmarks: Optional[Any] = None  # Raw Mediapipe NormalizedLandmarkList
     timestamp_ms: int = 0
-    is_valid: bool = False
-    error_message: Optional[str] = None
-    
-    def has_pose(self) -> bool:
-        """Kiểm tra có pose landmarks không."""
-        return self.pose_landmarks is not None and len(self.pose_landmarks) > 0
-    
-    def has_face(self) -> bool:
-        """Kiểm tra có face landmarks không."""
-        return self.face_landmarks is not None and len(self.face_landmarks) > 0
+
+
+class JointType(Enum):
+    """Joint types for angle calculation."""
+    LEFT_SHOULDER = "left_shoulder"
+    RIGHT_SHOULDER = "right_shoulder"
+    LEFT_ELBOW = "left_elbow"
+    RIGHT_ELBOW = "right_elbow"
+    LEFT_KNEE = "left_knee"
+    RIGHT_KNEE = "right_knee"
+    LEFT_HIP = "left_hip"
+    RIGHT_HIP = "right_hip"
+
+
+# Joint definitions for angle calculation
+JOINT_DEFINITIONS = {
+    JointType.LEFT_SHOULDER: {
+        'joints': [11, 13, 15],  # shoulder, elbow, wrist
+        'description': 'Left shoulder angle'
+    },
+    JointType.RIGHT_SHOULDER: {
+        'joints': [12, 14, 16],  # shoulder, elbow, wrist
+        'description': 'Right shoulder angle'
+    },
+    JointType.LEFT_ELBOW: {
+        'joints': [13, 11, 23],  # elbow, shoulder, hip
+        'description': 'Left elbow angle'
+    },
+    JointType.RIGHT_ELBOW: {
+        'joints': [14, 12, 24],  # elbow, shoulder, hip
+        'description': 'Right elbow angle'
+    },
+    JointType.LEFT_KNEE: {
+        'joints': [23, 25, 27],  # hip, knee, ankle
+        'description': 'Left knee angle'
+    },
+    JointType.RIGHT_KNEE: {
+        'joints': [24, 26, 28],  # hip, knee, ankle
+        'description': 'Right knee angle'
+    },
+}
+
+
+class MotionPhase(Enum):
+    """Phases of motion."""
+    PREPARATION = "preparation"
+    EXECUTION = "execution"
+    RETURN = "return"
+
+
+class SyncStatus(Enum):
+    """Synchronization status."""
+    SYNCED = "synced"
+    BEHIND = "behind"
+    AHEAD = "ahead"
+    LOST = "lost"
+
+
+@dataclass
+class SyncState:
+    """State of motion synchronization."""
+    status: SyncStatus = SyncStatus.LOST
+    phase: MotionPhase = MotionPhase.PREPARATION
+    progress: float = 0.0
+    user_angle: float = 0.0
+    target_angle: float = 0.0
+    sync_score: float = 0.0
 
 
 @dataclass
 class NormalizedSkeleton:
-    """
-    Skeleton đã được chuẩn hóa qua Procrustes Analysis.
-    
-    Attributes:
-        landmarks: Ma trận landmarks đã chuẩn hóa (N, 3).
-        centroid: Tâm của skeleton trước chuẩn hóa.
-        scale: Hệ số scale đã áp dụng.
-        rotation_matrix: Ma trận rotation đã áp dụng (3, 3).
-        original_landmarks: Landmarks gốc trước chuẩn hóa.
-    """
-    landmarks: np.ndarray
-    centroid: np.ndarray = field(default_factory=lambda: np.zeros(3))
+    """Normalized skeleton data."""
+    landmarks: List[Point3D] = field(default_factory=list)
+    center: Point3D = field(default_factory=lambda: Point3D(0, 0, 0))
     scale: float = 1.0
-    rotation_matrix: np.ndarray = field(default_factory=lambda: np.eye(3))
-    original_landmarks: Optional[np.ndarray] = None
 
 
 @dataclass
 class ProcrustesResult:
-    """
-    Kết quả của Procrustes Analysis.
-    
-    Attributes:
-        aligned_skeleton: Skeleton đã căn chỉnh theo reference.
-        disparity: Khoảng cách Procrustes (0 = hoàn toàn khớp).
-        transformation: Dictionary chứa các tham số biến đổi.
-    """
-    aligned_skeleton: NormalizedSkeleton
-    disparity: float
-    transformation: dict = field(default_factory=dict)
+    """Result of Procrustes analysis."""
+    rotation_matrix: np.ndarray = field(default_factory=lambda: np.eye(3))
+    translation: np.ndarray = field(default_factory=lambda: np.zeros(3))
+    scale: float = 1.0
+    disparity: float = 0.0
 
 
-# Định nghĩa các pose landmark indices quan trọng (MediaPipe Pose)
 class PoseLandmarkIndex:
-    """
-    Chỉ số các landmarks quan trọng trong MediaPipe Pose.
-    Tổng cộng 33 landmarks.
-    """
-    # Face
+    """MediaPipe Pose landmark indices."""
     NOSE = 0
     LEFT_EYE_INNER = 1
     LEFT_EYE = 2
@@ -181,8 +141,6 @@ class PoseLandmarkIndex:
     RIGHT_EAR = 8
     MOUTH_LEFT = 9
     MOUTH_RIGHT = 10
-    
-    # Upper body
     LEFT_SHOULDER = 11
     RIGHT_SHOULDER = 12
     LEFT_ELBOW = 13
@@ -195,8 +153,6 @@ class PoseLandmarkIndex:
     RIGHT_INDEX = 20
     LEFT_THUMB = 21
     RIGHT_THUMB = 22
-    
-    # Lower body
     LEFT_HIP = 23
     RIGHT_HIP = 24
     LEFT_KNEE = 25
@@ -207,14 +163,3 @@ class PoseLandmarkIndex:
     RIGHT_HEEL = 30
     LEFT_FOOT_INDEX = 31
     RIGHT_FOOT_INDEX = 32
-    
-    # Danh sách các landmarks chính cho so sánh tư thế
-    # (Loại bỏ các điểm trên mặt và ngón tay để giảm noise)
-    CORE_LANDMARKS = [
-        LEFT_SHOULDER, RIGHT_SHOULDER,
-        LEFT_ELBOW, RIGHT_ELBOW,
-        LEFT_WRIST, RIGHT_WRIST,
-        LEFT_HIP, RIGHT_HIP,
-        LEFT_KNEE, RIGHT_KNEE,
-        LEFT_ANKLE, RIGHT_ANKLE
-    ]

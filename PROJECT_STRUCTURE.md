@@ -253,6 +253,46 @@ Tất cả các API **BẮT BUỘC** phải trả về response theo cấu trúc
         ```
 *   **Tuyệt đối KHÔNG** return trực tiếp dictionary hoặc `HTTPException` của FastAPI (trừ khi đã được wrap bởi handler).
 
+### 6.5. Swagger Documentation Guidelines
+
+Tất cả các API endpoint **BẮT BUỘC** phải có docstring chi tiết để tự động tạo tài liệu Swagger/OpenAPI đầy đủ và dễ hiểu.
+
+*   **Cấu trúc Docstring**:
+    - **Dòng đầu**: Mô tả ngắn gọn chức năng của API (1-2 câu).
+    - **Authorization**: Xác định role hoặc quyền cần thiết để truy cập API.
+    - **Process**: Liệt kê các bước xử lý chính theo thứ tự.
+    - **Response**: Mô tả nội dung trả về.
+
+*   **Ví dụ**:
+    ```python
+    @router.post('/generate', response_model=DataResponse[CarePlanGenerationResponse])
+    def generate_care_plan(...):
+        """
+        Generate AI-powered care plan for patient.
+        
+        This API creates a personalized care plan using Gemini AI based on patient's profile, 
+        therapy history, and current health status. The plan includes daily tasks, medication 
+        reminders, exercise routines, and nutritional recommendations tailored to the patient's needs.
+        
+        **Authorization**: CARETAKER role required.
+        
+        **Process**:
+        1. Validates caretaker has assigned patient
+        2. Loads patient profile and therapy details
+        3. Calls Gemini AI to generate personalized care plan
+        4. Creates care_plan and task records in database
+        
+        **Response**: Care plan summary with task count and recommendations.
+        """
+    ```
+
+*   **Quy tắc viết**:
+    - Sử dụng **Markdown** trong docstring để format (bold, italic, lists).
+    - Mô tả **Process** theo thứ tự logic, sử dụng số thứ tự.
+    - **Authorization** phải rõ ràng (role, permission cụ thể).
+    - **Response** tóm tắt nội dung chính, không cần chi tiết schema (đã có response_model).
+    - Docstring phải bằng tiếng Anh để tương thích với Swagger.
+
 ## 7. Logging Guidelines
 
 Việc ghi log là bắt buộc để theo dõi hoạt động của hệ thống và debug lỗi.
@@ -275,8 +315,253 @@ Việc ghi log là bắt buộc để theo dõi hoạt động của hệ thốn
     *   Không log thông tin nhạy cảm (password, token).
     *   Luôn dùng `exc_info=True` khi log error để in ra stack trace.
 
+## 8. Strict Rules (Quy Tắc Nghiêm Ngặt)
 
+Để đảm bảo chất lượng code và tính nhất quán, **Memotion project áp dụng các quy tắc nghiêm ngặt sau**. Vi phạm sẽ bị từ chối trong code review.
+
+### 8.1. Type Hints (Bắt Buộc)
+
+*   **Tất cả functions/methods** phải có type hints đầy đủ:
+    ```python
+    def get_user_by_id(self, user_id: int) -> Optional[User]:
+        pass
+    ```
+*   **Không dùng `Any`** trừ khi thực sự cần thiết (và phải giải thích lý do).
+*   **Sử dụng Union types** thay vì Optional khi có nhiều kiểu:
+    ```python
+    def process_data(self, data: Union[dict, list]) -> bool:
+        pass
+    ```
+
+### 8.2. Docstring (Bắt Buộc)
+
+*   **Tất cả public methods** phải có docstring theo format Google/Numpy.
+*   **Tất cả classes** phải có docstring mô tả trách nhiệm.
+*   **Docstring tối thiểu** bao gồm: Mô tả ngắn, Args, Returns, Raises.
+
+### 8.3. Exception Handling (Bắt Buộc)
+
+*   **Không bao giờ catch generic Exception**:
+    ```python
+    # SAI
+    try:
+        do_something()
+    except Exception as e:
+        pass
+    
+    # ĐÚNG
+    try:
+        do_something()
+    except ValueError as e:
+        handle_value_error()
+    except ConnectionError as e:
+        handle_connection_error()
+    ```
+*   **Luôn raise CustomException** thay vì built-in exceptions.
+*   **Log tất cả exceptions** với `exc_info=True`.
+
+### 8.4. Dependency Injection (Bắt Buộc)
+
+*   **Không khởi tạo dependencies trực tiếp** trong class:
+    ```python
+    # SAI
+    class UserService:
+        def __init__(self):
+            self.repo = UserRepository()  # Hard dependency
+    
+    # ĐÚNG
+    class UserService:
+        def __init__(self, repo: UserRepository = Depends()):
+            self.repo = repo  # Injected
+    ```
+
+### 8.5. Database Transactions (Bắt Buộc)
+
+*   **Tất cả DB operations** phải trong transaction context.
+*   **Service layer** chịu trách nhiệm commit/rollback.
+*   **Không commit trong Repository layer**.
+
+### 8.6. Testing (Bắt Buộc)
+
+*   **Tất cả business logic** phải có unit tests.
+*   **Test coverage** tối thiểu 80%.
+*   **API endpoints** phải có integration tests.
+*   **Sử dụng pytest** framework.
+
+### 8.7. Code Review Requirements
+
+*   **Pull Request** phải có:
+    - Description chi tiết về thay đổi
+    - Test cases pass
+    - Code review từ ít nhất 1 reviewer
+    - Không có linting errors
+*   **Blocking Issues**:
+    - Syntax errors
+    - Import errors
+    - Missing type hints
+    - Missing docstrings
+    - Missing tests
+    - Security vulnerabilities
+
+### 8.8. Security Rules
+
+*   **Không log sensitive data**: password, tokens, PII.
+*   **Validate tất cả inputs** từ user.
+*   **Sử dụng parameterized queries** (SQLAlchemy đã handle).
+*   **Rate limiting** cho public APIs.
+*   **Input sanitization** cho text fields.
+
+### 8.9. Performance Rules
+
+*   **Không query N+1**: Sử dụng joins hoặc batch loading.
+*   **Pagination bắt buộc** cho list APIs.
+*   **Cache** cho dữ liệu thường xuyên truy cập.
+*   **Async** cho I/O operations (nếu cần).
+
+### 8.10. File Structure Rules
+
+*   **Một class per file** (trừ utility classes).
+*   **Max 300 lines per file**.
+*   **Max 50 lines per function**.
+*   **Alphabetical import ordering**.
+
+### 8.11. Naming Conventions (Strict)
+
+*   **Constants**: `UPPER_SNAKE_CASE`
+*   **Variables/Functions**: `snake_case`
+*   **Classes**: `PascalCase`
+*   **Private members**: `_leading_underscore`
+*   **Files**: `snake_case.py`
+
+### 8.12. Git Workflow
+
+*   **Feature branches**: `feature/feature-name`
+*   **Bug fixes**: `fix/bug-description`
+*   **Hot fixes**: `hotfix/critical-issue`
+*   **Squash commits** trước khi merge.
+*   **Rebase** thay vì merge conflicts.
+
+### 8.13. Monitoring & Alerting
+
+*   **Application metrics** phải được expose (response time, error rate).
+*   **Health checks** cho tất cả dependencies.
+*   **Alert** cho critical errors.
+*   **Log aggregation** và monitoring.
+
+### 8.14. Documentation
+
+*   **README.md** phải up-to-date.
+*   **API documentation** tự động từ docstrings.
+*   **Architecture decisions** phải được document.
+*   **Deployment guide** chi tiết.
+
+## 9. AI & MediaPipe Integration Rules
+
+### 9.1. AI Service Architecture
+
+**Nguyên tắc thiết kế AI Services:**
+- **Service Layer Centralization**: Tất cả logic AI processing phải được tập trung trong Service Layer (`app/services/srv_pose_detection.py`).
+- **MediaPipe Integration**: Service phải sử dụng trực tiếp các modules từ `mediapipe_integration` thay vì implement logic riêng.
+- **Phase-Based Processing**: Tuân thủ strict 3-phase logic (Detection → Measuring → Scoring) với transition rules rõ ràng.
+
+**Cấm tuyệt đối:**
+- ❌ **KHÔNG** viết logic AI processing trong API Layer.
+- ❌ **KHÔNG** duplicate MediaPipe functions trong Service.
+- ❌ **KHÔNG** bypass Service Layer để gọi MediaPipe trực tiếp từ API.
+
+### 9.2. MediaPipe Module Usage
+
+**Required Components:**
+```python
+# VisionDetector - Phase 1 (Detection)
+from ..mediapipe_integration.core import VisionDetector, DetectorConfig
+
+# Kinematics - Phase 2 (Measuring)
+from ..mediapipe_integration.core import calculate_joint_angle, PoseLandmarkIndex
+
+# HealthScorer - Phase 3 (Scoring)
+from ..mediapipe_integration.modules import HealthScorer
+
+# MotionSyncController - Reference video sync
+from ..mediapipe_integration.core import MotionSyncController
+
+# VideoEngine - Reference video processing
+from ..mediapipe_integration.modules import VideoEngine
+```
+
+**Phase Implementation Rules:**
+- **Phase 1 (Detection)**: Sử dụng `VisionDetector.process_frame()` để detect person và tính stability.
+- **Phase 2 (Measuring)**: Sử dụng `calculate_joint_angle()` để tính angles, thu thập motion data.
+- **Phase 3 (Scoring)**: Sử dụng `HealthScorer` methods để tính ROM, stability, flow, symmetry scores.
+
+### 9.3. Service Method Structure
+
+```python
+class PoseDetectionService:
+    async def start_pose_session(self, ...) -> Dict[str, Any]:
+        """Initialize MediaPipe components for session"""
+
+    async def process_frame_stream(self, session_id, frame_data, phase) -> Dict[str, Any]:
+        """Route to phase-specific processing"""
+
+    async def _process_detection_frame(self, session, frame_data) -> Dict[str, Any]:
+        """Phase 1: Use VisionDetector"""
+
+    async def _process_measuring_frame(self, session, frame_data) -> Dict[str, Any]:
+        """Phase 2: Use kinematics functions"""
+
+    async def _process_scoring_frame(self, session, frame_data) -> Dict[str, Any]:
+        """Phase 3: Use HealthScorer + MotionSyncController"""
+```
+
+### 9.4. API Layer Responsibilities
+
+**API Layer chỉ được:**
+- ✅ Nhận WebSocket frame data
+- ✅ Validate session existence
+- ✅ Gọi `pose_detection_service.process_frame_stream()`
+- ✅ Forward service response về client
+- ✅ Handle connection management
+
+**API Layer KHÔNG được:**
+- ❌ Process frame data
+- ❌ Calculate angles/scores
+- ❌ Access MediaPipe modules
+- ❌ Implement phase logic
+
+### 9.5. Error Handling & Logging
+
+**Service Layer:**
+- Log tất cả phase transitions
+- Log frame processing metrics
+- Handle MediaPipe exceptions gracefully
+- Return structured error responses
+
+**API Layer:**
+- Log WebSocket events
+- Forward service errors to client
+- Maintain connection stability
+
+### 9.6. Testing Requirements
+
+**Unit Tests:**
+- Test each MediaPipe function integration
+- Mock frame data for phase testing
+- Test phase transition logic
+
+**Integration Tests:**
+- End-to-end WebSocket flow
+- Service-API communication
+- MediaPipe pipeline validation
+
+### 9.7. Performance Guidelines
+
+- **Frame Processing**: < 100ms per frame
+- **Memory Management**: Cleanup session components
+- **Concurrent Sessions**: Support multiple users
+- **Resource Limits**: Monitor MediaPipe resource usage
 
 ---
+
 *Tài liệu này dùng để định hướng phát triển cho team Memotion.*
 

@@ -28,11 +28,23 @@ services:
       - PROJECT_NAME=Memotion
       - SQL_DATABASE_URL=postgresql://postgres:postgres@memotion-db:5432/memotion_db
       - SECRET_KEY=changeme
+      - PORT=8005
+      - POSE_DETECTION_ENABLED=true
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - /home/hieuvu/static:/app/static
+    networks:
+      - memotion-network
+
+  frontend:
+    build: ./frontend
+    container_name: memotion-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
     networks:
       - memotion-network
 
