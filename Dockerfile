@@ -1,5 +1,5 @@
 # Stage 1: Build dependencies
-FROM python:3.10-slim AS builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
@@ -12,12 +12,14 @@ ENV PYTHONUNBUFFERED=1
 # FFmpeg libraries and pkg-config are needed for PyAV (av package)
 # OpenCV and MediaPipe dependencies: libglib2.0-0, libsm6, libxext6, libxrender-dev, libgomp1, libgthread-2.0-0
 # Additional for MediaPipe: libgtk-3-0, libgdk-pixbuf-2.0-0, libcairo-gobject2, libpango-1.0-0, libatk1.0-0, libcairo2
+# libgl1-mesa-glx for OpenCV libGL.so.1
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc libpq-dev build-essential \
     ffmpeg libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev \
     libavfilter-dev libswscale-dev libswresample-dev pkg-config \
     libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 libgthread-2.0-0 \
-    libgtk-3-0 libgdk-pixbuf-2.0-0 libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 && \
+    libgtk-3-0 libgdk-pixbuf-2.0-0 libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 \
+    libgl1-mesa-glx && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
@@ -30,7 +32,7 @@ RUN pip install --upgrade pip && \
 
 
 # Stage 2: Runtime image
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -42,7 +44,8 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libpq5 \
     libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 libgthread-2.0-0 \
-    libgtk-3-0 libgdk-pixbuf-2.0-0 libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 && \
+    libgtk-3-0 libgdk-pixbuf-2.0-0 libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 \
+    libgl1-mesa-glx && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy wheels and requirements from builder stage
