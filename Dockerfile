@@ -1,5 +1,5 @@
 # Stage 1: Build dependencies
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -32,7 +32,7 @@ RUN pip install --upgrade pip && \
 
 
 # Stage 2: Runtime image
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
@@ -61,6 +61,7 @@ COPY . .
 # Set environment variables
 ENV PORT=8005
 ENV POSE_DETECTION_ENABLED=true
+ENV QT_QPA_PLATFORM=offscreen
 
 # Expose the port the app runs on
 EXPOSE 8005
