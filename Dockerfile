@@ -17,7 +17,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc libpq-dev build-essential \
     ffmpeg libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev \
     libavfilter-dev libswscale-dev libswresample-dev pkg-config \
-    libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 libgthread-2.0-0 \
+    libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 \
     libgtk-3-0 libgdk-pixbuf-2.0-0 libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 \
     libgl1-mesa-glx && \
     rm -rf /var/lib/apt/lists/*
@@ -43,7 +43,7 @@ ENV PYTHONUNBUFFERED=1
 # We don't need gcc or build tools here, keeping the image small
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libpq5 \
-    libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 libgthread-2.0-0 \
+    libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 \
     libgtk-3-0 libgdk-pixbuf-2.0-0 libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 \
     libgl1-mesa-glx && \
     rm -rf /var/lib/apt/lists/*
