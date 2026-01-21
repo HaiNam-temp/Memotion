@@ -18,7 +18,7 @@ class PoseDetectionSessionStartRequest(BaseModel):
     camera_source: int = Field(default=0, description="Camera source (0=back, 1=front)")
     model_complexity: int = Field(default=1, description="MediaPipe model complexity (0-2)")
     stability_threshold: float = Field(default=0.7, description="Stability threshold for phase transition")
-    min_measuring_frames: int = Field(default=100, description="Minimum frames to collect in measuring phase")
+    min_measuring_frames: int = Field(default=360, description="Minimum frames to collect in measuring phase (360 = 12 seconds at 30fps)")
     auto_phase_transition: bool = Field(default=True, description="Enable automatic phase transitions")
     reference_video_path: Optional[str] = Field(default=None, description="Path to reference video")
     task_id: Optional[str] = Field(default=None, description="Optional task ID for session association")

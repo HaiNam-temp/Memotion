@@ -16,18 +16,20 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 
 # Import MediaPipe integration modules
-from ..mediapipe_integration.core import (
+from ..mediapipe.AI.service import (
     VisionDetector, DetectorConfig, JointType, JOINT_DEFINITIONS,
     calculate_joint_angle, MotionPhase, SyncStatus, SyncState,
     MotionSyncController, create_arm_raise_exercise, create_elbow_flex_exercise,
     compute_single_joint_dtw, PoseLandmarkIndex,
-)
-from ..mediapipe_integration.modules import (
     HealthScorer, VideoEngine, PlaybackState, PainDetector, PainLevel,
-    SafeMaxCalibrator, CalibrationState, UserProfile,
+    SafeMaxCalibrator, CalibrationState,
+    FatigueLevel, calculate_jerk, calculate_center_of_mass, rescale_reference_motion,
 )
-from ..mediapipe_integration.utils import (
+from ..mediapipe.modules.calibration import UserProfile
+from ..mediapipe.utils import (
     SessionLogger,
+    LogLevel,
+    LogCategory,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,7 +43,7 @@ class PoseDetectionService:
 
     def __init__(self):
         # Initialize MediaPipe components
-        model_path = Path("app/mediapipe_models/pose_landmarker_lite.task").resolve()
+        model_path = Path("app/pose_landmarker_lite.task").resolve()
         self._detector_config = DetectorConfig(
             pose_model_path=str(model_path),
             running_mode="VIDEO"
@@ -147,20 +149,20 @@ class PoseDetectionService:
             video_engine = self._video_engines.get(exercise_id)
             if not video_engine:
                 # Create a dummy video engine for testing
-                from ..mediapipe_integration.modules import VideoEngine
+                from ..mediapipe.AI.service import VideoEngine
                 video_engine = VideoEngine(video_path=None)
                 logger.warning(f"[POSE_SERVICE] Using dummy video engine for exercise {exercise_id}")
 
             # Create exercise based on type (arm raise or elbow flex)
+            # Use default total_frames for testing (300 frames = ~10 seconds at 30fps)
+            total_frames = 300
             if "arm" in exercise_id.lower():
-                reference_angles = create_arm_raise_exercise()
+                reference_angles = create_arm_raise_exercise(total_frames=total_frames)
             else:
-                reference_angles = create_elbow_flex_exercise()
+                reference_angles = create_elbow_flex_exercise(total_frames=total_frames)
 
-            # Note: MotionSyncController constructor might need to be updated
-            # For now, create it without video_engine parameter
-            motion_sync = MotionSyncController()
-            motion_sync.update_reference(reference_angles)  # Set reference angles from exercise
+            # Note: MotionSyncController constructor needs exercise parameter
+            motion_sync = MotionSyncController(exercise=reference_angles)
             health_scorer = HealthScorer()
             pain_detector = PainDetector()
             session_logger = SessionLogger(session_id)
@@ -277,8 +279,12 @@ class PoseDetectionService:
         components = self._session_components[session_id]
 
         try:
+            # Decode base64 frame data
+            import base64
+            frame_bytes = base64.b64decode(frame_data)
+            
             # Decode frame
-            nparr = np.frombuffer(frame_data, np.uint8)
+            nparr = np.frombuffer(frame_bytes, np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
             # Process with VisionDetector
@@ -289,7 +295,7 @@ class PoseDetectionService:
             person_detected = detection_result.pose_landmarks is not None
             # Calculate confidence from visibilities
             if detection_result.pose_landmarks:
-                visibilities = [lm.visibility for lm in detection_result.pose_landmarks if hasattr(lm, 'visibility') and lm.visibility is not None]
+                visibilities = [lm.visibility for lm in detection_result.pose_landmarks.landmarks if hasattr(lm, 'visibility') and lm.visibility is not None]
                 stability_score = sum(visibilities) / len(visibilities) if visibilities else 0.0
             else:
                 stability_score = 0.0
@@ -303,7 +309,7 @@ class PoseDetectionService:
                 frame_number=session['phase_data']['detection']['frames_processed'],
                 person_detected=person_detected,
                 confidence=stability_score,
-                landmarks=detection_result.pose_landmarks
+                landmarks=detection_result.pose_landmarks.landmarks if detection_result.pose_landmarks else None
             )
 
             if person_detected and stability_score > session['stability_threshold']:
@@ -369,15 +375,19 @@ class PoseDetectionService:
         components = self._session_components[session_id]
 
         try:
+            # Decode base64 frame data
+            import base64
+            frame_bytes = base64.b64decode(frame_data)
+            
             # Decode frame
-            nparr = np.frombuffer(frame_data, np.uint8)
+            nparr = np.frombuffer(frame_bytes, np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
             # Process with VisionDetector
             timestamp_ms = int(time.time() * 1000)
             detection_result = self._vision_detector.process_frame(frame, timestamp_ms)
 
-            if not detection_result.person_detected or not detection_result.landmarks:
+            if not detection_result.has_pose():
                 return {
                     'status': 'measuring_feedback',
                     'error': 'Person not detected',
@@ -390,61 +400,85 @@ class PoseDetectionService:
             try:
                 # Calculate shoulder angles (for arm exercises)
                 left_shoulder_angle = calculate_joint_angle(
-                    detection_result.landmarks,
-                    PoseLandmarkIndex.LEFT_SHOULDER,
-                    PoseLandmarkIndex.LEFT_ELBOW,
-                    PoseLandmarkIndex.LEFT_HIP
+                    detection_result.pose_landmarks, JointType.LEFT_SHOULDER, use_3d=False
                 )
                 right_shoulder_angle = calculate_joint_angle(
-                    detection_result.landmarks,
-                    PoseLandmarkIndex.RIGHT_SHOULDER,
-                    PoseLandmarkIndex.RIGHT_ELBOW,
-                    PoseLandmarkIndex.RIGHT_HIP
+                    detection_result.pose_landmarks, JointType.RIGHT_SHOULDER, use_3d=False
                 )
 
                 # Calculate elbow angles
                 left_elbow_angle = calculate_joint_angle(
-                    detection_result.landmarks,
-                    PoseLandmarkIndex.LEFT_ELBOW,
-                    PoseLandmarkIndex.LEFT_SHOULDER,
-                    PoseLandmarkIndex.LEFT_WRIST
+                    detection_result.pose_landmarks, JointType.LEFT_ELBOW, use_3d=False
                 )
                 right_elbow_angle = calculate_joint_angle(
-                    detection_result.landmarks,
-                    PoseLandmarkIndex.RIGHT_ELBOW,
-                    PoseLandmarkIndex.RIGHT_SHOULDER,
-                    PoseLandmarkIndex.RIGHT_WRIST
+                    detection_result.pose_landmarks, JointType.RIGHT_ELBOW, use_3d=False
                 )
 
+                # Validate angles are reasonable (not NaN, not extreme values)
+                def validate_angle(angle, min_val=0, max_val=180):
+                    if np.isnan(angle) or np.isinf(angle):
+                        return 0.0
+                    return max(min_val, min(max_val, angle))
+
                 angles = {
-                    'left_shoulder': left_shoulder_angle,
-                    'right_shoulder': right_shoulder_angle,
-                    'left_elbow': left_elbow_angle,
-                    'right_elbow': right_elbow_angle
+                    'left_shoulder': validate_angle(left_shoulder_angle),
+                    'right_shoulder': validate_angle(right_shoulder_angle),
+                    'left_elbow': validate_angle(left_elbow_angle),
+                    'right_elbow': validate_angle(right_elbow_angle)
                 }
 
+                # Only store frame if angles are meaningful (not all zeros and within reasonable range)
+                angles_valid = any(angle > 5 for angle in angles.values())  # At least one angle > 5 degrees
+                
             except Exception as e:
                 logger.warning(f"[SERVICE] Angle calculation failed: {e}")
-                angles = {}
+                angles = {
+                    'left_shoulder': 0.0,
+                    'right_shoulder': 0.0,
+                    'left_elbow': 0.0,
+                    'right_elbow': 0.0
+                }
+                angles_valid = False
 
-            # Store frame data
-            frame_data_entry = {
-                'timestamp': time.time(),
-                'landmarks': detection_result.landmarks,
-                'angles': angles
-            }
-            session['measuring_frames'].append(frame_data_entry)
+            # Only store valid frames with meaningful angles
+            if angles_valid:
+                # Store frame data
+                frame_data_entry = {
+                    'timestamp': time.time(),
+                    'landmarks': detection_result.pose_landmarks,
+                    'angles': angles
+                }
+                session['measuring_frames'].append(frame_data_entry)
 
-            # Update phase data
-            session['phase_data']['measuring']['frames_processed'] += 1
-            session['phase_data']['measuring']['angles_calculated'].append(angles)
+                # Update phase data
+                session['phase_data']['measuring']['frames_processed'] += 1
+                session['phase_data']['measuring']['angles_calculated'].append(angles)
 
-            # Log measuring data
-            components['session_logger'].log_measuring_frame(
-                frame_number=session['phase_data']['measuring']['frames_processed'],
-                landmarks=detection_result.landmarks,
-                angles=angles
-            )
+                # Log measuring data with angle information
+                logger.info(f"[SERVICE] Measuring frame {session['phase_data']['measuring']['frames_processed']}: "
+                           f"Angles - Left Elbow: {angles.get('left_elbow', 0):.1f}°, "
+                           f"Right Elbow: {angles.get('right_elbow', 0):.1f}°, "
+                           f"Left Shoulder: {angles.get('left_shoulder', 0):.1f}°, "
+                           f"Right Shoulder: {angles.get('right_shoulder', 0):.1f}°")
+
+                # Optional: Log to session logger if available
+                if 'session_logger' in components:
+                    components['session_logger'].log(
+                        LogLevel.INFO,
+                        LogCategory.MEASURING,
+                        f"Frame {session['phase_data']['measuring']['frames_processed']}: "
+                        f"Left Elbow: {angles.get('left_elbow', 0):.1f}°, "
+                        f"Right Elbow: {angles.get('right_elbow', 0):.1f}°, "
+                        f"Left Shoulder: {angles.get('left_shoulder', 0):.1f}°, "
+                        f"Right Shoulder: {angles.get('right_shoulder', 0):.1f}°",
+                        {
+                            "frame_number": session['phase_data']['measuring']['frames_processed'],
+                            "angles": angles,
+                            "landmarks_count": len(detection_result.pose_landmarks) if detection_result.pose_landmarks else 0
+                        }
+                    )
+            else:
+                logger.debug(f"[SERVICE] Skipping invalid measuring frame (no meaningful angles)")
 
             frames_captured = len(session['measuring_frames'])
             total_required = session['min_measuring_frames']
@@ -489,15 +523,19 @@ class PoseDetectionService:
         components = self._session_components[session_id]
 
         try:
+            # Decode base64 frame data
+            import base64
+            frame_bytes = base64.b64decode(frame_data)
+            
             # Decode frame
-            nparr = np.frombuffer(frame_data, np.uint8)
+            nparr = np.frombuffer(frame_bytes, np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
             # Process with VisionDetector
             timestamp_ms = int(time.time() * 1000)
             detection_result = self._vision_detector.process_frame(frame, timestamp_ms)
 
-            if not detection_result.person_detected or not detection_result.landmarks:
+            if not detection_result.has_pose():
                 return {
                     'status': 'scoring_feedback',
                     'error': 'Person not detected',
@@ -512,37 +550,42 @@ class PoseDetectionService:
             try:
                 current_angles = {
                     'left_shoulder': calculate_joint_angle(
-                        detection_result.pose_landmarks,
-                        PoseLandmarkIndex.LEFT_SHOULDER,
-                        PoseLandmarkIndex.LEFT_ELBOW,
-                        PoseLandmarkIndex.LEFT_HIP
+                        detection_result.pose_landmarks, JointType.LEFT_SHOULDER, use_3d=False
                     ),
                     'right_shoulder': calculate_joint_angle(
-                        detection_result.pose_landmarks,
-                        PoseLandmarkIndex.RIGHT_SHOULDER,
-                        PoseLandmarkIndex.RIGHT_ELBOW,
-                        PoseLandmarkIndex.RIGHT_HIP
+                        detection_result.pose_landmarks, JointType.RIGHT_SHOULDER, use_3d=False
                     ),
                     'left_elbow': calculate_joint_angle(
-                        detection_result.pose_landmarks,
-                        PoseLandmarkIndex.LEFT_ELBOW,
-                        PoseLandmarkIndex.LEFT_SHOULDER,
-                        PoseLandmarkIndex.LEFT_WRIST
+                        detection_result.pose_landmarks, JointType.LEFT_ELBOW, use_3d=False
                     ),
                     'right_elbow': calculate_joint_angle(
-                        detection_result.pose_landmarks,
-                        PoseLandmarkIndex.RIGHT_ELBOW,
-                        PoseLandmarkIndex.RIGHT_SHOULDER,
-                        PoseLandmarkIndex.RIGHT_WRIST
+                        detection_result.pose_landmarks, JointType.RIGHT_ELBOW, use_3d=False
                     )
                 }
+                
+                # Validate angles
+                def validate_angle(angle, min_val=0, max_val=180):
+                    if np.isnan(angle) or np.isinf(angle):
+                        return 0.0
+                    return max(min_val, min(max_val, angle))
+                
+                current_angles = {k: validate_angle(v) for k, v in current_angles.items()}
+                
             except Exception as e:
                 logger.warning(f"[SERVICE] Current angle calculation failed: {e}")
-                current_angles = {}
+                current_angles = {
+                    'left_shoulder': 0.0,
+                    'right_shoulder': 0.0,
+                    'left_elbow': 0.0,
+                    'right_elbow': 0.0
+                }
 
             # Sync with reference video
             motion_sync = components['motion_sync']
-            sync_result = motion_sync.process_frame(detection_result.pose_landmarks, timestamp_ms)
+            # Get current ref_frame from motion_sync state
+            current_ref_frame = motion_sync.state.ref_frame
+            # Update motion sync with user angle and current ref_frame
+            sync_result = motion_sync.update(current_angles.get('left_elbow', 0), current_ref_frame, timestamp_ms)
 
             # Calculate health scores using HealthScorer
             health_scorer = components['health_scorer']
@@ -562,11 +605,11 @@ class PoseDetectionService:
             if reference_angles:
                 try:
                     # Use DTW for flow scoring
-                    dtw_score = compute_single_joint_dtw(
+                    dtw_result = compute_single_joint_dtw(
                         [angles.get('left_shoulder', 0) for angles in reference_angles],
                         [angles.get('left_shoulder', 0) for angles in [current_angles]]
                     )
-                    flow_scores = {'overall_flow': max(0, 100 - dtw_score * 10)}  # Convert to percentage
+                    flow_scores = {'overall_flow': dtw_result.similarity_score}  # DTWResult already has similarity_score as percentage
                 except Exception as e:
                     logger.warning(f"[SERVICE] DTW calculation failed: {e}")
                     flow_scores = {'overall_flow': 85.0}
@@ -584,7 +627,8 @@ class PoseDetectionService:
 
             # Check pain detection
             pain_detector = components['pain_detector']
-            pain_level = pain_detector.detect_pain(detection_result.pose_landmarks, current_angles)
+            pain_result = pain_detector.analyze(detection_result.pose_landmarks)
+            pain_level = pain_result.pain_level
 
             # Determine if pose is correct (high similarity to reference)
             similarity_score = sync_result.confidence if sync_result else 0.5

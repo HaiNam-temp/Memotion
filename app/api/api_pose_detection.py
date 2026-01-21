@@ -108,7 +108,7 @@ logger = logging.getLogger(__name__)
 try:
     # Giả sử mediapipe modules được copy vào app/mediapipe_integration/
     logger.info("Attempting to import MediaPipe modules...")
-    from app.mediapipe_integration.core import (
+    from app.mediapipe.AI.service import (
         VisionDetector, DetectorConfig, JointType, JOINT_DEFINITIONS,
         calculate_joint_angle, MotionPhase, SyncStatus, SyncState,
         MotionSyncController, create_arm_raise_exercise, create_elbow_flex_exercise,
@@ -123,7 +123,7 @@ try:
     # )
     # logger.info("Modules imported successfully")
 
-    from app.mediapipe_integration.utils import (
+    from app.mediapipe.utils import (
         SessionLogger,
     )
     logger.info("Utils imported successfully")

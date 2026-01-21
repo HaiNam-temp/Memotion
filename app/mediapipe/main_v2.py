@@ -48,12 +48,12 @@ from core import (
     MotionSyncController, create_arm_raise_exercise, create_elbow_flex_exercise,
     compute_single_joint_dtw, PoseLandmarkIndex,
 )
-from modules import (
+from .modules import (
     VideoEngine, PlaybackState, PainDetector, PainLevel,
     HealthScorer, FatigueLevel, SafeMaxCalibrator, CalibrationState,
     UserProfile,
 )
-from utils import (
+from .utils import (
     SessionLogger, put_vietnamese_text, draw_skeleton, draw_panel,
     draw_progress_bar, draw_phase_indicator, COLORS, draw_angle_arc,
     combine_frames_horizontal,
@@ -1317,7 +1317,7 @@ def run_unit_tests():
     print("=" * 60)
     
     print("\n[TEST 1] Visualization...")
-    from utils.visualization import put_vietnamese_text, draw_skeleton
+    from .utils.visualization import put_vietnamese_text, draw_skeleton
     test_frame = np.zeros((480, 640, 3), dtype=np.uint8)
     result = put_vietnamese_text(test_frame, "Test tieng Viet", (10, 50), (255, 255, 255))
     assert result.shape == test_frame.shape
