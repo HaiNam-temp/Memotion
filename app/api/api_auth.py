@@ -26,12 +26,13 @@ def login_access_token(form_data: LoginRequest, user_service: UserService = Depe
     elif not user.is_active:
         raise CustomException(http_code=400, code='400', message='Inactive user')
 
-    # Update is_first_login to False if it's True
-    if user.is_first_login:
+    # Check if first login
+    is_first = user.is_first_login
+    if is_first:
         user.is_first_login = False
-        db.session.commit()
+        user_service.user_repo.update(user)
 
-    return DataResponse().success_response(data=Token(access_token=create_access_token(user_id=str(user.user_id))))
+    return DataResponse().success_response(data=Token(access_token=create_access_token(user_id=str(user.user_id)), is_first_login=is_first))
 
 @router.post('/register', response_model=DataResponse)
 def register(register_data: UserRegisterRequest, user_service: UserService = Depends()) -> Any:

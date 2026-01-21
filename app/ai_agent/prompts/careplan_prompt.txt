@@ -23,7 +23,7 @@ Today is {current_date}. All due dates should start from this date and span the 
    - MEDICATION: Use medication_id from Available Medications only
    - NUTRITION: Use nutrition_id from Available Nutrition Plans only
    - EXERCISE: Use exercise_id from Available Exercises only
-   - GENERAL: For reminders, check-ins, or custom care activities
+   - DO NOT use GENERAL tasks - always use appropriate library items
 
 3. **Task Scheduling**:
    - Medications: Schedule according to frequency_per_day (e.g., 3x/day → 08:00, 13:00, 20:00)
@@ -68,7 +68,7 @@ Each task pattern object defines a recurring task and must have:
 - "owner_type": "PATIENT" or "CARETAKER"
 - "title": string (max 255 characters)
 - "description": string
-- "task_type": "MEDICATION", "NUTRITION", "EXERCISE", or "GENERAL"
+- "task_type": "MEDICATION", "NUTRITION", or "EXERCISE"
 - "due_dates": array of "YYYY-MM-DD HH:MM:SS" strings (specific dates/times when this task should occur)
 - "medication_id": UUID string (REQUIRED only if task_type="MEDICATION")
 - "nutrition_id": UUID string (REQUIRED only if task_type="NUTRITION") 
@@ -86,7 +86,7 @@ CRITICAL: For MEDICATION, NUTRITION, and EXERCISE tasks, you MUST include the co
 - "MEDICATION": Use medication_id from Available Medications section above - REQUIRED
 - "NUTRITION": Use nutrition_id from Available Nutrition Plans section above - REQUIRED  
 - "EXERCISE": Use exercise_id from Available Exercises section above - REQUIRED
-- "GENERAL": Only use when no appropriate library item exists (reminders, check-ins, custom care)
+- DO NOT use "GENERAL" task type
 
 **due_dates**:
 - Array of strings in "YYYY-MM-DD HH:MM:SS" format

@@ -35,7 +35,7 @@ class TaskRecommendation(BaseModel):
     owner_type: str = Field(..., description="PATIENT or CARETAKER")
     title: str = Field(..., description="Task title")
     description: str = Field(..., description="Detailed task description")
-    task_type: str = Field(..., description="MEDICATION, NUTRITION, EXERCISE, or GENERAL")
+    task_type: str = Field(..., description="MEDICATION, NUTRITION, or EXERCISE")
     schedule_time: str = Field(..., description="Scheduled time (HH:MM)")
     priority: str = Field(..., description="HIGH, MEDIUM, or LOW")
     resource_id: Optional[str] = Field(None, description="UUID of medication/nutrition/exercise")
