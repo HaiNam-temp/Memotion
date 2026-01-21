@@ -53,15 +53,9 @@ class UserRegisterRequest(BaseModel):
 
 
 class CreatePatientByCaretakerRequest(BaseModel):
-    full_name: str = Field(..., description="Patient's full name (username)")
-    email: EmailStr = Field(..., description="Patient's email address")
-    phone: Optional[str] = None
-    role: UserRole = UserRole.PATIENT
-    
-    # Fields for Patient creation if role is CARETAKER
-    patient_full_name: Optional[str] = None
-    patient_email: Optional[EmailStr] = None
-    patient_phone: Optional[str] = None
+    patient_full_name: str = Field(..., description="Patient's full name")
+    patient_email: EmailStr = Field(..., description="Patient's email address")
+    patient_phone: str = Field(..., description="Patient's phone number")
 
 
 class UserRegisterV2Request(BaseModel):

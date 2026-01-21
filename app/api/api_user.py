@@ -107,21 +107,22 @@ def create_patient_by_caretaker(
     API for caretakers to create patient accounts.
     
     This API allows authenticated caretakers to create new patient accounts.
-    The patient will share the same password as the caretaker and be automatically
-    linked to them in a 1-1 relationship.
+    The patient will have a default password and be automatically
+    linked to the caretaker in a 1-1 relationship.
     
     **Authorization**: Authenticated caretaker required.
     
     **Process**:
-    1. Validate caretaker authentication
-    2. Check patient email uniqueness
-    3. Create patient account with caretaker's password
+    1. Validate caretaker authentication via token
+    2. Find caretaker user from token
+    3. Create patient account with default password
     4. Establish caretaker-patient relationship
     5. Return created patient information
     
     **Request Body**:
-    - full_name: Patient's full name (required)
-    - email: Patient's email address (required, unique)
+    - patient_full_name: Patient's full name (required)
+    - patient_email: Patient's email address (required, unique)
+    - patient_phone: Patient's phone number (required)
     
     **Response**: Created patient information.
     """
