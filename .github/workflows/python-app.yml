@@ -21,12 +21,14 @@ jobs:
       - name: Install system dependencies for MediaPipe/OpenCV
         run: |
           sudo apt-get update
+          # Ubuntu 24.04 uses libgl1 instead of libgl1-mesa-glx
+          # libgthread-2.0-0 is now part of libglib2.0-0
           sudo apt-get install -y ffmpeg libavformat-dev libavcodec-dev \
             libavdevice-dev libavutil-dev libavfilter-dev libswscale-dev \
             libswresample-dev pkg-config libglib2.0-0 libsm6 libxext6 \
             libxrender-dev libgomp1 libgtk-3-0 libgdk-pixbuf-2.0-0 \
             libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 \
-            libgl1-mesa-glx libgthread-2.0-0
+            libgl1 libglx-mesa0 libglvnd0 libegl1
 
       - name: Install Python dependencies
         run: |

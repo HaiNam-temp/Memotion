@@ -11,13 +11,14 @@ ENV PYTHONUNBUFFERED=1
 # libpq-dev is needed to build psycopg2
 # FFmpeg libraries and pkg-config are needed for PyAV (av package)
 # OpenCV and MediaPipe dependencies
+# Note: libgl1 works on both Debian 12 and Ubuntu 24.04
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc libpq-dev build-essential \
     ffmpeg libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev \
     libavfilter-dev libswscale-dev libswresample-dev pkg-config \
     libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 \
     libgtk-3-0 libgdk-pixbuf-2.0-0 libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 \
-    libgl1-mesa-glx libgthread-2.0-0 && \
+    libgl1 libglx-mesa0 libglvnd0 libegl1 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
@@ -42,11 +43,12 @@ ENV QT_QPA_PLATFORM=offscreen
 ENV MPLBACKEND=Agg
 
 # Install runtime libraries for postgres (libpq5) and MediaPipe/OpenCV
+# Note: libgl1 works on both Debian 12 and Ubuntu 24.04
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libpq5 ffmpeg curl \
     libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1 \
     libgtk-3-0 libgdk-pixbuf-2.0-0 libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 \
-    libgl1-mesa-glx libgthread-2.0-0 && \
+    libgl1 libglx-mesa0 libglvnd0 libegl1 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy wheels and requirements from builder stage
