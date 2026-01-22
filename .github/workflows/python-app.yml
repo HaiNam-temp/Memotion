@@ -18,15 +18,24 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install system dependencies
+      - name: Install system dependencies for MediaPipe/OpenCV
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev libavfilter-dev libswscale-dev libswresample-dev pkg-config
+          sudo apt-get install -y ffmpeg libavformat-dev libavcodec-dev \
+            libavdevice-dev libavutil-dev libavfilter-dev libswscale-dev \
+            libswresample-dev pkg-config libglib2.0-0 libsm6 libxext6 \
+            libxrender-dev libgomp1 libgtk-3-0 libgdk-pixbuf-2.0-0 \
+            libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 \
+            libgl1-mesa-glx libgthread-2.0-0
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r app/requirements.txt
+
+      - name: Test MediaPipe import
+        run: |
+          python -c "import cv2; import mediapipe; print('MediaPipe OK:', mediapipe.__version__)"
 
       - name: Build Docker image
         run: |
@@ -35,39 +44,45 @@ jobs:
 
       - name: Save Docker image to tar
         run: |
-          echo "Building Docker image: ${{ secrets.DOCKER_IMAGE }}"
+          echo "Saving Docker image: ${{ secrets.DOCKER_IMAGE }}"
           docker save ${{ secrets.DOCKER_IMAGE }}:latest -o fastapi_app.tar
           
-      - name: Debug SSH key format
-        run: |
-          echo "${{ secrets.SERVER_SSH_KEY }}" | head -n 5
-          echo "..."
-           
-      - name: Deploy to server manually
+      - name: Deploy to server
         env:
           SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
           DOCKER_IMAGE: ${{ secrets.DOCKER_IMAGE }}
           DOCKER_CONTAINER: ${{ secrets.DOCKER_CONTAINER }}
-          PORT : ${{ secrets.PORT }}
+          PORT: ${{ secrets.PORT }}
         run: |
           mkdir -p ~/.ssh
           echo "$SERVER_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p 2222 -H $SERVER_HOST >> ~/.ssh/known_hosts
           scp -P 2222 -i ~/.ssh/deploy_key fastapi_app.tar ${SERVER_USER}@${SERVER_HOST}:~/
-          ssh -p 2222 -i ~/.ssh/deploy_key ${SERVER_USER}@${SERVER_HOST} << EOF
+          ssh -p 2222 -i ~/.ssh/deploy_key ${SERVER_USER}@${SERVER_HOST} << 'EOF'
             docker load -i ~/fastapi_app.tar
-            docker stop ${DOCKER_CONTAINER} || true
-            docker rm ${DOCKER_CONTAINER} || true
-            docker run -d --name ${DOCKER_CONTAINER} \
+            docker stop ${{ secrets.DOCKER_CONTAINER }} || true
+            docker rm ${{ secrets.DOCKER_CONTAINER }} || true
+            docker run -d --name ${{ secrets.DOCKER_CONTAINER }} \
               --restart unless-stopped \
               --add-host host.docker.internal:host-gateway \
               -e SQL_DATABASE_URL="postgresql://postgres:postgres@host.docker.internal:5333/memotion_db" \
               -e SECRET_KEY="changeme" \
               -e PROJECT_NAME="Memotion" \
               -e GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+              -e POSE_DETECTION_ENABLED=true \
+              -e PYTHONPATH="/app:/app/app/mediapipe/mediapipe_be" \
+              -e QT_QPA_PLATFORM=offscreen \
+              -e MPLBACKEND=Agg \
               -v /home/hieuvu/static:/app/static \
-              -p 8005:8005 ${DOCKER_IMAGE}
+              -v /home/hieuvu/memotion_logs:/app/logs \
+              -p 8005:8005 ${{ secrets.DOCKER_IMAGE }}
+            
+            # Wait for container to start
+            sleep 5
+            
+            # Check container health
+            docker logs --tail 20 ${{ secrets.DOCKER_CONTAINER }}
           EOF

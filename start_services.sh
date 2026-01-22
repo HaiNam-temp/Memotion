@@ -2,46 +2,84 @@
 
 # Memotion Services Startup Script
 # This script starts all necessary services for the Memotion application
+# Works on both local development and Docker container
 
-echo "Starting Memotion Services..."
+echo "=========================================="
+echo "   MEMOTION Backend Startup Script"
+echo "=========================================="
 
-# Set environment variables
-export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+# Set environment variables for MediaPipe
+export PYTHONPATH="${PYTHONPATH}:$(pwd):$(pwd)/app/mediapipe/mediapipe_be"
+export POSE_DETECTION_ENABLED=true
+export QT_QPA_PLATFORM=offscreen
+export MPLBACKEND=Agg
 
-# Check if virtual environment exists
-if [ ! -d ".venv" ]; then
-    echo "Virtual environment not found. Please run setup first."
-    exit 1
+echo "PYTHONPATH: $PYTHONPATH"
+
+# Check if running in Docker (no venv needed)
+if [ -f "/.dockerenv" ]; then
+    echo "Running in Docker container..."
+else
+    # Check if virtual environment exists for local development
+    if [ -d ".venv" ]; then
+        echo "Activating virtual environment..."
+        if [ -f ".venv/bin/activate" ]; then
+            source .venv/bin/activate
+        elif [ -f ".venv/Scripts/activate" ]; then
+            source .venv/Scripts/activate
+        fi
+    else
+        echo "Warning: Virtual environment not found. Using system Python."
+    fi
 fi
-
-# Activate virtual environment
-echo "Activating virtual environment..."
-source .venv/Scripts/activate  # For Windows Git Bash
-# source .venv/bin/activate    # For Linux/Mac
 
 # Check if required packages are installed
-echo "Checking dependencies..."
+echo ""
+echo "Checking core dependencies..."
 python -c "import fastapi, uvicorn, sqlalchemy, pydantic" 2>/dev/null
 if [ $? -ne 0 ]; then
-    echo "Missing required packages. Please install dependencies."
-    echo "Run: pip install -r requirements.txt"
+    echo "ERROR: Missing core packages. Please install dependencies."
+    echo "Run: pip install -r app/requirements.txt"
     exit 1
 fi
+echo "✓ Core dependencies OK"
 
-# Check if database is accessible (optional)
-echo "Checking database connection..."
-# Add database check here if needed
+# Check MediaPipe/OpenCV
+echo "Checking MediaPipe/OpenCV..."
+python -c "import cv2; import mediapipe; print('  OpenCV:', cv2.__version__); print('  MediaPipe:', mediapipe.__version__)" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo "WARNING: MediaPipe/OpenCV not available. Pose detection will be disabled."
+else
+    echo "✓ MediaPipe/OpenCV OK"
+fi
 
-# Start the main FastAPI server with pose detection
-echo "Starting FastAPI server with pose detection..."
-echo "Server will be available at: http://localhost:8000"
-echo "API docs: http://localhost:8000/docs"
-echo "WebSocket endpoint: ws://localhost:8000/api/pose/stream/{session_id}"
+# Check MediaPipe BE module
+echo "Checking MediaPipe BE module..."
+python -c "from app.mediapipe.mediapipe_be import MemotionEngine; print('  MemotionEngine:', 'OK')" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo "WARNING: MediaPipe BE module not available."
+else
+    echo "✓ MediaPipe BE module OK"
+fi
+
+# Create necessary directories
+mkdir -p logs static/uploads/exercise models
+
 echo ""
-echo "Press Ctrl+C to stop the server"
+echo "=========================================="
+echo "Starting FastAPI server..."
+echo "=========================================="
+echo "Server: http://0.0.0.0:${PORT:-8005}"
+echo "API docs: http://localhost:${PORT:-8005}/docs"
+echo "WebSocket: ws://localhost:${PORT:-8005}/api/pose/sessions/{id}/ws"
 echo ""
+echo "Press Ctrl+C to stop"
+echo "=========================================="
 
+# Start the main FastAPI server
 python -m app.main
 
-# Deactivate virtual environment on exit
-deactivate
+# Cleanup on exit
+if [ -d ".venv" ]; then
+    deactivate 2>/dev/null || true
+fi

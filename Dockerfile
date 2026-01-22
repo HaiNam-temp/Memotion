@@ -10,23 +10,20 @@ ENV PYTHONUNBUFFERED=1
 # gcc and build-essential are often needed for numpy, pandas, etc.
 # libpq-dev is needed to build psycopg2
 # FFmpeg libraries and pkg-config are needed for PyAV (av package)
-# OpenCV and MediaPipe dependencies: libglib2.0-0, libsm6, libxext6, libxrender-dev, libgomp1, libgthread-2.0-0
-# Additional for MediaPipe: libgtk-3-0, libgdk-pixbuf-2.0-0, libcairo-gobject2, libpango-1.0-0, libatk1.0-0, libcairo2
-# libgl1-mesa-glx for OpenCV libGL.so.1
+# OpenCV and MediaPipe dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc libpq-dev build-essential \
     ffmpeg libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev \
     libavfilter-dev libswscale-dev libswresample-dev pkg-config \
     libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 \
     libgtk-3-0 libgdk-pixbuf-2.0-0 libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 \
-    libgl1-mesa-glx && \
+    libgl1-mesa-glx libgthread-2.0-0 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
 COPY app/requirements.txt .
 
 # Upgrade pip and create wheels for dependencies
-# Creating wheels allows us to compile once and install quickly in the next stage
 RUN pip install --upgrade pip && \
     pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
@@ -38,14 +35,18 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+# MediaPipe/OpenCV environment variables
+ENV PYTHONPATH="/app:/app/app/mediapipe/mediapipe_be:${PYTHONPATH}"
+ENV POSE_DETECTION_ENABLED=true
+ENV QT_QPA_PLATFORM=offscreen
+ENV MPLBACKEND=Agg
 
 # Install runtime libraries for postgres (libpq5) and MediaPipe/OpenCV
-# We don't need gcc or build tools here, keeping the image small
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libpq5 \
-    libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 \
+    apt-get install -y --no-install-recommends libpq5 ffmpeg curl \
+    libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1 \
     libgtk-3-0 libgdk-pixbuf-2.0-0 libcairo-gobject2 libpango-1.0-0 libatk1.0-0 libcairo2 \
-    libgl1-mesa-glx && \
+    libgl1-mesa-glx libgthread-2.0-0 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy wheels and requirements from builder stage
@@ -58,13 +59,21 @@ RUN pip install --no-cache /wheels/*
 # Copy the rest of the application code
 COPY . .
 
+# Create necessary directories
+RUN mkdir -p /app/static/uploads/exercise \
+    /app/logs \
+    /app/models
+
 # Set environment variables
 ENV PORT=8005
-ENV POSE_DETECTION_ENABLED=true
-ENV QT_QPA_PLATFORM=offscreen
+ENV HOST=0.0.0.0
 
 # Expose the port the app runs on
 EXPOSE 8005
 
-# Command to run the application
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8005/health || exit 1
+
+# Command to run the application with MediaPipe support
 CMD ["python", "-m", "app.main"]
