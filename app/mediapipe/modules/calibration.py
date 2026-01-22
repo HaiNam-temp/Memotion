@@ -28,12 +28,12 @@ from typing import Dict, List, Optional, Tuple
 from enum import Enum
 import numpy as np
 
-from ..core.kinematics import (
+from core.kinematics import (
     JointType,
     calculate_joint_angle,
     JOINT_DEFINITIONS,
 )
-from ..core.data_types import LandmarkSet
+from core.data_types import LandmarkSet
 
 
 class CalibrationState(Enum):

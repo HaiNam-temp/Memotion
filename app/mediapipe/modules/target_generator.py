@@ -27,8 +27,8 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple, Dict
 import numpy as np
 
-from ..core.kinematics import JointType
-from .calibration import UserProfile
+from core.kinematics import JointType
+from modules.calibration import UserProfile
 
 
 @dataclass
@@ -91,16 +91,35 @@ def compute_scale_factor(
         - Nhưng không quá cao để gây áp lực hoặc chấn thương
     
     Args:
-        user_max_angle: Góc tối đa an toàn của người dùng (degrees).
-        ref_max_angle: Góc tối đa trong video mẫu (degrees).
-        challenge_factor: Hệ số thử thách α (default 0.05 = 5%).
+        user_max_angle: Góc tối đa an toàn của người dùng (degrees, phải >= 0).
+        ref_max_angle: Góc tối đa trong video mẫu (degrees, phải > 0).
+        challenge_factor: Hệ số thử thách α (default 0.05 = 5%, phải >= 0).
         
     Returns:
         float: Hệ số scale. Giá trị < 1 nghĩa là giảm biên độ.
         
     Raises:
-        ValueError: Nếu ref_max_angle = 0 (tránh chia cho 0).
+        ValueError: Nếu ref_max_angle <= 0 hoặc các góc âm.
     """
+    # Validate: Góc không thể âm (không có ý nghĩa vật lý)
+    if user_max_angle < 0:
+        raise ValueError(
+            f"user_max_angle phải >= 0, nhận được {user_max_angle}. "
+            "Góc âm không có ý nghĩa vật lý trong phục hồi chức năng."
+        )
+    
+    if ref_max_angle < 0:
+        raise ValueError(
+            f"ref_max_angle phải >= 0, nhận được {ref_max_angle}. "
+            "Video mẫu không thể có góc âm."
+        )
+    
+    if challenge_factor < 0:
+        raise ValueError(
+            f"challenge_factor phải >= 0, nhận được {challenge_factor}. "
+            "Hệ số thử thách âm không có ý nghĩa."
+        )
+    
     # Xử lý edge case: video mẫu không có chuyển động
     if ref_max_angle < 1e-6:
         raise ValueError(

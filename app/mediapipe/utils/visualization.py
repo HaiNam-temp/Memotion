@@ -21,7 +21,7 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-from ..core.data_types import PoseLandmarkIndex
+from core.data_types import PoseLandmarkIndex
 
 
 # MediaPipe Pose Connections (định nghĩa các đường nối skeleton)

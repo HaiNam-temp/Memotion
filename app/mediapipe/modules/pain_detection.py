@@ -32,7 +32,7 @@ from collections import deque
 import time
 import numpy as np
 
-from ..core.data_types import LandmarkSet
+from core.data_types import LandmarkSet
 
 
 class PainLevel(Enum):

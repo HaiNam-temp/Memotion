@@ -48,12 +48,12 @@ from core import (
     MotionSyncController, create_arm_raise_exercise, create_elbow_flex_exercise,
     compute_single_joint_dtw, PoseLandmarkIndex,
 )
-from .modules import (
+from modules import (
     VideoEngine, PlaybackState, PainDetector, PainLevel,
     HealthScorer, FatigueLevel, SafeMaxCalibrator, CalibrationState,
     UserProfile,
 )
-from .utils import (
+from utils import (
     SessionLogger, put_vietnamese_text, draw_skeleton, draw_panel,
     draw_progress_bar, draw_phase_indicator, COLORS, draw_angle_arc,
     combine_frames_horizontal,
@@ -475,14 +475,14 @@ def run_unit_tests():
     print(f"  ✓ Total Score: {rep_score.total_score:.1f}")
     
     print("\n[TEST 3] Jerk calculation...")
-    from .modules.scoring import calculate_jerk
+    from modules.scoring import calculate_jerk
     positions = np.array([[0, 0, 0], [1, 0, 0], [3, 0, 0], [6, 0, 0], [10, 0, 0]])
     timestamps = np.array([0, 0.1, 0.2, 0.3, 0.4])
     jerk = calculate_jerk(positions, timestamps)
     print(f"  ✓ Jerk value: {jerk:.4f}")
     
     print("\n[TEST 4] SessionLogger...")
-    from .utils import create_session_logger
+    from utils import create_session_logger
     logger = create_session_logger("./test_logs", console=False)
     logger.start_session("test_session", "test_exercise")
     logger.log_rep(1, {"total": 85})

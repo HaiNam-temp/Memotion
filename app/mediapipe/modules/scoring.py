@@ -25,9 +25,9 @@ from enum import Enum
 import time
 import numpy as np
 
-from ..core.kinematics import JointType
-from ..core.synchronizer import MotionPhase
-from ..core.dtw_analysis import DTWResult
+from core.kinematics import JointType
+from core.synchronizer import MotionPhase
+from core.dtw_analysis import DTWResult
 
 
 class FatigueLevel(Enum):

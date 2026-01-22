@@ -17,5 +17,18 @@ class Settings(BaseSettings):
     LOGGING_CONFIG_FILE = os.path.join(BASE_DIR, 'logging.ini')
     UPLOAD_DIR = os.path.join(BASE_DIR, 'static', 'uploads')
 
+    # MediaPipe / Pose Detection settings
+    MEDIAPIPE_MODELS_DIR = os.getenv(
+        'MEDIAPIPE_MODELS_DIR', 
+        os.path.join(BASE_DIR, 'app', 'mediapipe', 'mediapipe_be', 'models')
+    )
+    MEDIAPIPE_LOG_DIR = os.getenv(
+        'MEDIAPIPE_LOG_DIR',
+        os.path.join(BASE_DIR, 'app', 'mediapipe', 'mediapipe_be', 'data', 'logs')
+    )
+    POSE_SESSION_TIMEOUT = int(os.getenv('POSE_SESSION_TIMEOUT', '3600'))  # 1 hour default
+    POSE_DETECTION_ENABLED = os.getenv('POSE_DETECTION_ENABLED', 'true').lower() == 'true'
+    MEDIAPIPE_MODEL_COMPLEXITY = int(os.getenv('MEDIAPIPE_MODEL_COMPLEXITY', '1'))
+
 
 settings = Settings()

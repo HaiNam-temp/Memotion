@@ -298,7 +298,7 @@ def run_unit_tests():
     
     # Test 7: UserProfile serialization
     print("\n[TEST 7] UserProfile JSON serialization...")
-    from .modules.calibration import JointCalibrationData
+    from modules.calibration import JointCalibrationData
     profile = UserProfile(user_id="test_user", name="Test", age=70)
     profile.joint_limits["left_elbow"] = JointCalibrationData(
         joint_type="left_elbow", max_angle=120.5, min_angle=30.0, confidence=0.95,

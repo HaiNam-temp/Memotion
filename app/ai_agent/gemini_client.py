@@ -93,12 +93,34 @@ class GeminiClient:
                 generation_config=generation_config
             )
 
-            if not response.text:
-                logger.error("Gemini returned empty response")
+            # Check if response has valid candidates before accessing .text
+            if not response.candidates:
+                logger.error("Gemini returned no candidates")
+                raise Exception("Gemini API returned no candidates")
+            
+            # Check finish reason
+            candidate = response.candidates[0]
+            finish_reason = getattr(candidate, 'finish_reason', None)
+            
+            # finish_reason 1 = STOP (normal), 2 = MAX_TOKENS, 3 = SAFETY, 4 = RECITATION, 5 = OTHER
+            if finish_reason and finish_reason not in [1, 2]:  # Only STOP and MAX_TOKENS are acceptable
+                logger.error(f"Gemini content blocked. finish_reason: {finish_reason}")
+                raise Exception(f"Content was blocked by Gemini (finish_reason={finish_reason})")
+            
+            # Check if candidate has content
+            if not candidate.content or not candidate.content.parts:
+                logger.error("Gemini candidate has no content parts")
+                raise Exception("Gemini API returned empty content")
+            
+            # Safely get text
+            response_text = candidate.content.parts[0].text if candidate.content.parts else ""
+            
+            if not response_text:
+                logger.error("Gemini returned empty response text")
                 raise Exception("Empty response from Gemini API")
 
-            logger.info(f"Successfully generated content ({len(response.text)} chars)")
-            return response.text
+            logger.info(f"Successfully generated content ({len(response_text)} chars)")
+            return response_text
 
         except Exception as e:
             logger.error(f"Gemini API error: {str(e)}", exc_info=True)
