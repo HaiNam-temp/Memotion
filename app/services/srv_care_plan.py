@@ -356,6 +356,7 @@ class CarePlanService:
     ) -> Dict[str, Any]:
         """
         Generate care plan for the patient assigned to the caretaker.
+        Also updates patient's is_first_login to False if it was True.
         """
         # Get assigned patient
         patient = self.user_repo.get_assigned_patient(current_user.user_id)
@@ -365,6 +366,12 @@ class CarePlanService:
                 code='404',
                 message='No patient assigned to this caretaker.'
             )
+
+        # Update patient's is_first_login to False after first care plan generation
+        if patient.is_first_login:
+            patient.is_first_login = False
+            self.user_repo.update(patient)
+            logger.info(f"Updated is_first_login=False for patient {patient.user_id}")
 
         return self.generate_care_plan_for_patient(
             patient_id=patient.user_id,

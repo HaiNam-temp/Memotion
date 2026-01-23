@@ -191,15 +191,22 @@ class GeminiClient:
                 return parsed_json
             except json.JSONDecodeError as e1:
                 logger.warning(f"Failed to parse extracted JSON: {str(e1)}")
-                # Try to fix common JSON issues
+                # Try to fix common JSON issues (including truncated responses)
                 fixed_json = self._fix_malformed_json(extracted_json)
-                if fixed_json != extracted_json:
+                try:
+                    parsed_json = json.loads(fixed_json)
+                    logger.info("Successfully parsed fixed JSON response from Gemini")
+                    return parsed_json
+                except json.JSONDecodeError as e2:
+                    logger.warning(f"Fixed JSON also failed: {str(e2)}")
+                    # Also try fixing the original response
+                    fixed_original = self._fix_malformed_json(original_response)
                     try:
-                        parsed_json = json.loads(fixed_json)
-                        logger.info("Successfully parsed fixed JSON response from Gemini")
+                        parsed_json = json.loads(fixed_original)
+                        logger.info("Successfully parsed fixed original response")
                         return parsed_json
-                    except json.JSONDecodeError as e2:
-                        logger.warning(f"Fixed JSON also failed: {str(e2)}")
+                    except json.JSONDecodeError as e3:
+                        logger.warning(f"Fixed original also failed: {str(e3)}")
                 
                 # Fallback: try parsing the original response
                 logger.warning("Failed to parse extracted JSON, trying original response")
@@ -215,7 +222,8 @@ class GeminiClient:
             logger.error(f"Full response text: {original_response}")
             # Log the problematic character position
             if extracted_json:
-                logger.error(f"Character at error position: {extracted_json[min(len(extracted_json)-1, 381)]}")
+                error_pos = min(len(extracted_json)-1, e.pos if hasattr(e, 'pos') else 0)
+                logger.error(f"Character at error position: {extracted_json[error_pos]}")
             raise Exception(f"Invalid JSON response from Gemini: {str(e)}")
         except Exception as e:
             logger.error(f"Error generating JSON content: {str(e)}", exc_info=True)
@@ -275,7 +283,7 @@ class GeminiClient:
 
     def _fix_malformed_json(self, json_str: str) -> str:
         """
-        Attempt to fix common JSON formatting issues.
+        Attempt to fix common JSON formatting issues, especially truncated responses.
         
         Args:
             json_str: Potentially malformed JSON string.
@@ -283,37 +291,73 @@ class GeminiClient:
         Returns:
             Fixed JSON string.
         """
-        # Fix unterminated strings by adding closing quotes
-        lines = json_str.split('\n')
-        fixed_lines = []
+        import re
         
-        for line in lines:
-            line = line.rstrip()
-            # Count quotes in the line
-            quote_count = line.count('"')
-            # If odd number of quotes, the string might be unterminated
-            if quote_count % 2 == 1:
-                # Find the last quote and add closing quote if needed
-                last_quote_pos = line.rfind('"')
-                if last_quote_pos != -1 and not line.endswith('"'):
-                    # Check if there are commas or braces after the last quote
-                    after_quote = line[last_quote_pos + 1:]
-                    if ',' in after_quote or '}' in after_quote or ']' in after_quote:
-                        # Insert closing quote before the punctuation
-                        for punct in [',', '}', ']']:
-                            punct_pos = after_quote.find(punct)
-                            if punct_pos != -1:
-                                line = line[:last_quote_pos + 1] + '"' + after_quote
-                                break
-            fixed_lines.append(line)
+        fixed_json = json_str.strip()
         
-        fixed_json = '\n'.join(fixed_lines)
+        # 1. Remove trailing comma before closing brackets/braces
+        fixed_json = re.sub(r',\s*(\]|\})', r'\1', fixed_json)
         
-        # If no changes were made, return original
-        if fixed_json == json_str:
-            return json_str
+        # 2. Balance brackets and braces
+        open_braces = fixed_json.count('{')
+        close_braces = fixed_json.count('}')
+        open_brackets = fixed_json.count('[')
+        close_brackets = fixed_json.count(']')
+        
+        # 3. If response is truncated mid-task, try to close the current object properly
+        # Check if we have unclosed array/object inside task_patterns
+        if '"task_patterns"' in fixed_json and open_brackets > close_brackets:
+            # Find the last complete task object (ends with })
+            last_complete = fixed_json.rfind('},')
+            if last_complete == -1:
+                last_complete = fixed_json.rfind('}')
             
-        logger.info(f"Attempted to fix malformed JSON: {fixed_json[:500]}...")
+            if last_complete > 0:
+                # Truncate to last complete task
+                truncated = fixed_json[:last_complete + 1]
+                
+                # Add missing closing brackets if needed
+                remaining_brackets = truncated.count('[') - truncated.count(']')
+                remaining_braces = truncated.count('{') - truncated.count('}')
+                
+                # Close the task_patterns array
+                if remaining_brackets > 0:
+                    truncated += '\n  ]'
+                    remaining_brackets -= 1
+                
+                # Add recommendations if missing
+                if '"recommendations"' not in truncated:
+                    truncated += ',\n  "recommendations": ["Monitor patient condition", "Consult healthcare provider if needed"]'
+                
+                # Close the main object
+                if remaining_braces > 0:
+                    truncated += '\n}'
+                    
+                fixed_json = truncated
+        
+        # 4. Ensure the JSON ends properly if still unbalanced
+        open_braces = fixed_json.count('{')
+        close_braces = fixed_json.count('}')
+        open_brackets = fixed_json.count('[')
+        close_brackets = fixed_json.count(']')
+        
+        # Add missing closing brackets first (arrays inside objects)
+        while open_brackets > close_brackets:
+            fixed_json += ']'
+            close_brackets += 1
+            
+        # Add missing closing braces
+        while open_braces > close_braces:
+            fixed_json += '}'
+            close_braces += 1
+        
+        # 5. Remove trailing comma before we added closing brackets
+        fixed_json = re.sub(r',\s*(\]|\})', r'\1', fixed_json)
+        
+        if fixed_json != json_str:
+            logger.info(f"Fixed malformed/truncated JSON")
+            logger.debug(f"Fixed JSON preview: {fixed_json[:500]}...")
+            
         return fixed_json
 
     def chat(self, messages: list, temperature: float = 0.7) -> str:

@@ -27,6 +27,8 @@ class UserRepository:
         return user_data
 
     def update(self, user: User) -> User:
+        self.db.merge(user)
+        self.db.flush()
         self.db.commit()
         self.db.refresh(user)
         return user

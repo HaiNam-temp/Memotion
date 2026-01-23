@@ -190,8 +190,8 @@ class SafeMaxCalibrator:
     
     # Cấu hình mặc định
     DEFAULT_DURATION_MS = 5000  # 5 giây
-    MIN_SAMPLES = 30  # Ít nhất 30 frames
-    MEDIAN_WINDOW_SIZE = 5  # Kích thước cửa sổ median filter
+    MIN_SAMPLES = 8  # Ít nhất 8 frames (cho mobile ~2 FPS)
+    MEDIAN_WINDOW_SIZE = 3  # Kích thước cửa sổ median filter (giảm vì ít samples)
     STABILITY_THRESHOLD = 5.0  # Ngưỡng ổn định (degrees)
     
     def __init__(

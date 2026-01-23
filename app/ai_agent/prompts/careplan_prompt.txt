@@ -56,13 +56,20 @@ Today is {current_date}. All due dates should start from this date and span the 
    - Do NOT schedule more than 8-10 tasks per day to avoid overwhelming the patient
    - Space tasks appropriately (at least 30-60 minutes apart)
 
+7. **CRITICAL - Task Limit for Response Size**:
+   - Generate MAXIMUM 6 task_patterns total (not 6 per type, 6 TOTAL)
+   - Prioritize the most important tasks: 1-2 medications, 2-3 nutrition, 1-2 exercises
+   - Keep due_dates arrays short (max 7 dates per pattern)
+   - Keep descriptions brief and concise (max 100 characters)
+   - This limit ensures the JSON response is complete and not truncated
+
 === OUTPUT FORMAT ===
 
 You MUST respond with ONLY a valid JSON object. Do not include any text before or after the JSON. Do not use markdown code blocks. Do not explain your response.
 
 The JSON must have this exact structure:
-- "task_patterns": array of task pattern objects
-- "recommendations": array of strings
+- "task_patterns": array of task pattern objects (MAXIMUM 6 patterns total)
+- "recommendations": array of 2-3 short strings
 
 Each task pattern object defines a recurring task and must have:
 - "owner_type": "PATIENT" or "CARETAKER"
@@ -103,14 +110,15 @@ CRITICAL: For MEDICATION, NUTRITION, and EXERCISE tasks, you MUST include the co
 - Copy the UUID strings exactly as shown in the Available Resources section
 
 === IMPORTANT REMINDERS ===
+- **CRITICAL: Generate MAXIMUM 6 task_patterns to ensure complete JSON response**
 - PRIORITY: Use MEDICATION, NUTRITION, and EXERCISE tasks from available libraries BEFORE creating GENERAL tasks
 - Resource IDs: Copy the exact UUID strings from the Available Resources section above
-- Due_dates must be arrays of "YYYY-MM-DD HH:MM:SS" strings within the plan period
-- Each due_dates array should contain appropriate number of dates (not too many per day)
+- Due_dates must be arrays of "YYYY-MM-DD HH:MM:SS" strings (max 7 dates per pattern)
+- Keep descriptions brief (max 100 characters)
 - Owner types: PATIENT, CARETAKER
-- Task types: MEDICATION, NUTRITION, EXERCISE, GENERAL (use library tasks first)
-- Create task patterns that cover the {plan_duration_days}-day period appropriately
+- Task types: MEDICATION, NUTRITION, EXERCISE (use library tasks first)
 - Be empathetic and patient-centered in task descriptions
 - Do NOT create GENERAL tasks when appropriate library items exist
+- Generate 2-3 short recommendations only
 
-Now generate the care plan:
+Now generate the care plan (remember: max 6 task_patterns, keep response compact):

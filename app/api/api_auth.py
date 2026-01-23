@@ -26,13 +26,8 @@ def login_access_token(form_data: LoginRequest, user_service: UserService = Depe
     elif not user.is_active:
         raise CustomException(http_code=400, code='400', message='Inactive user')
 
-    # Check if first login
-    is_first = user.is_first_login
-    if is_first:
-        user.is_first_login = False
-        user_service.user_repo.update(user)
-
-    return DataResponse().success_response(data=Token(access_token=create_access_token(user_id=str(user.user_id)), is_first_login=is_first))
+    # Return current is_first_login value (will be updated when care plan is generated)
+    return DataResponse().success_response(data=Token(access_token=create_access_token(user_id=str(user.user_id)), is_first_login=user.is_first_login))
 
 @router.post('/register', response_model=DataResponse)
 def register(register_data: UserRegisterRequest, user_service: UserService = Depends()) -> Any:

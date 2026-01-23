@@ -221,46 +221,87 @@ class PoseDetectionService:
         return frame
     
     def _extract_phase_data(self, output_dict: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract phase-specific data from engine output."""
+        """Extract phase-specific data from engine output.
+        
+        Engine trả về data trong các field riêng biệt:
+        - phase 1: detection
+        - phase 2: calibration  
+        - phase 3: sync
+        - phase 4: final_report
+        """
         phase = output_dict.get('phase', 1)
-        data = {}
         
         if phase == 1:  # Detection
-            data = {
-                'pose_detected': output_dict.get('pose_detected', False),
-                'stable_count': output_dict.get('stable_count', 0),
-                'progress': output_dict.get('progress', 0.0),
-                'landmarks': output_dict.get('landmarks', [])
+            # Lấy data từ field 'detection'
+            detection = output_dict.get('detection', {}) or {}
+            return {
+                'pose_detected': detection.get('pose_detected', False),
+                'stable_count': detection.get('stable_count', 0),
+                'progress': detection.get('progress', 0.0),
+                'countdown_remaining': detection.get('countdown_remaining'),
+                'status': detection.get('status', ''),
+                'message': detection.get('message', ''),
+                'landmarks': detection.get('landmarks', [])
             }
         elif phase == 2:  # Calibration
-            data = {
-                'current_joint': output_dict.get('current_joint'),
-                'current_joint_name': output_dict.get('current_joint_name'),
-                'current_angle': output_dict.get('current_angle', 0.0),
-                'max_angle': output_dict.get('max_angle', 0.0),
-                'progress': output_dict.get('progress', 0.0)
+            # Lấy data từ field 'calibration'
+            calibration = output_dict.get('calibration', {}) or {}
+            return {
+                'current_joint': calibration.get('current_joint'),
+                'current_joint_name': calibration.get('current_joint_name'),
+                'queue_index': calibration.get('queue_index', 0),
+                'total_joints': calibration.get('total_joints', 6),
+                'progress': calibration.get('progress', 0.0),
+                'overall_progress': calibration.get('overall_progress', 0.0),
+                'current_angle': calibration.get('current_angle', 0.0),
+                'user_max_angle': calibration.get('user_max_angle', 0.0),
+                'countdown_remaining': calibration.get('countdown_remaining'),
+                'status': calibration.get('status', ''),
+                'position_instruction': calibration.get('position_instruction', ''),
+                'joints_status': calibration.get('joints_status', []),
+                'message': calibration.get('message', '')
             }
         elif phase == 3:  # Sync
-            data = {
-                'video_frame': output_dict.get('video_frame'),
-                'current_score': output_dict.get('current_score', 0.0),
-                'rep_count': output_dict.get('rep_count', 0),
-                'fatigue_level': output_dict.get('fatigue_level', 'FRESH')
+            # Lấy data từ field 'sync'
+            sync = output_dict.get('sync', {}) or {}
+            return {
+                'video_frame': sync.get('video_frame'),
+                'current_score': sync.get('current_score', 0.0),
+                'rep_count': sync.get('rep_count', 0),
+                'fatigue_level': sync.get('fatigue_level', 'FRESH'),
+                'joint_errors': sync.get('joint_errors', []),
+                'motion_phase': sync.get('motion_phase', ''),
+                'feedback': sync.get('feedback', '')
             }
         elif phase == 4:  # Scoring
-            data = {
-                'total_score': output_dict.get('total_score', 0.0),
-                'rom_score': output_dict.get('rom_score', 0.0),
-                'stability_score': output_dict.get('stability_score', 0.0),
-                'flow_score': output_dict.get('flow_score', 0.0),
-                'grade': output_dict.get('grade', '')
+            # Lấy data từ field 'final_report'
+            report = output_dict.get('final_report', {}) or {}
+            return {
+                'total_score': report.get('total_score', 0.0),
+                'rom_score': report.get('rom_score', 0.0),
+                'stability_score': report.get('stability_score', 0.0),
+                'flow_score': report.get('flow_score', 0.0),
+                'grade': report.get('grade', ''),
+                'grade_color': report.get('grade_color', 'yellow'),
+                'total_reps': report.get('total_reps', 0),
+                'recommendations': report.get('recommendations', [])
             }
         
-        return data
+        return {}
     
     def _get_phase_message(self, output_dict: Dict[str, Any]) -> Optional[str]:
         """Get user-friendly message for current phase."""
         phase = output_dict.get('phase', 1)
+        
+        # Lấy message từ nested field
+        phase_key_map = {1: 'detection', 2: 'calibration', 3: 'sync', 4: 'final_report'}
+        phase_key = phase_key_map.get(phase)
+        if phase_key:
+            nested_data = output_dict.get(phase_key, {}) or {}
+            if nested_data.get('message'):
+                return nested_data.get('message')
+        
+        # Fallback messages
         messages = {
             1: "Đang phát hiện tư thế...",
             2: "Đang hiệu chỉnh khớp...",
