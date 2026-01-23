@@ -178,7 +178,7 @@ class UserService:
     def create_patient_by_caretaker(self, data: CreatePatientByCaretakerRequest, current_user: User):
         """
         Create a new patient account by a caretaker.
-        The patient will have a default password and be linked to the caretaker.
+        The patient will have the same password as the caretaker.
         """
         # Validate that current user is a caretaker
         if current_user.role != UserRole.CARETAKER.value:
@@ -188,10 +188,8 @@ class UserService:
         if self.user_repo.get_by_email(data.patient_email):
             raise CustomException(http_code=400, code='400', message="Patient email already exists")
         
-        # Create patient with default password
-        from app.core.security import get_password_hash
-        default_password = "defaultpassword123"  # Or generate random
-        hashed_password = get_password_hash(default_password)
+        # Use caretaker's hashed password for patient (same password)
+        hashed_password = current_user.hashed_password
         
         new_patient = User(
             full_name=data.patient_full_name,
@@ -200,6 +198,7 @@ class UserService:
             phone=data.patient_phone,
             is_active=True,
             role=UserRole.PATIENT.value,
+            is_first_login=True,
         )
         
         created_patient = self.user_repo.create(new_patient)

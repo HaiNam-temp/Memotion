@@ -27,11 +27,11 @@ class UserRepository:
         return user_data
 
     def update(self, user: User) -> User:
-        self.db.merge(user)
-        self.db.flush()
+        # Merge trả về object mới đã được attach vào session
+        merged_user = self.db.merge(user)
         self.db.commit()
-        self.db.refresh(user)
-        return user
+        self.db.refresh(merged_user)
+        return merged_user
 
     def create_patient_caretaker(self, patient_id, caretaker_id):
         patient_caretaker = PatientCaretaker(
