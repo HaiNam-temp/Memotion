@@ -26,6 +26,7 @@ from app.models.model_task import Task
 from app.models.model_user import User
 from app.helpers.enums import UserRole
 from app.helpers.exception_handler import CustomException
+from app.services.srv_user import UserService
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,8 @@ class CarePlanService:
         medication_repo: MedicationLibraryRepository = Depends(),
         nutrition_repo: NutritionLibraryRepository = Depends(),
         exercise_repo: ExerciseLibraryRepository = Depends(),
-        user_repo: UserRepository = Depends()
+        user_repo: UserRepository = Depends(),
+        user_service: UserService = Depends()
     ):
         """
         Initialize service with repository dependencies.
@@ -57,6 +59,7 @@ class CarePlanService:
             nutrition_repo: Nutrition library repository.
             exercise_repo: Exercise library repository.
             user_repo: User repository.
+            user_service: User service for handling user operations.
         """
         self.care_plan_repo = care_plan_repo
         self.profile_repo = profile_repo
@@ -65,6 +68,7 @@ class CarePlanService:
         self.nutrition_repo = nutrition_repo
         self.exercise_repo = exercise_repo
         self.user_repo = user_repo
+        self.user_service = user_service
         self.ai_agent = CarePlanAgent()
 
     def generate_care_plan_for_patient(
@@ -348,44 +352,6 @@ class CarePlanService:
             'updated_at': updated_plan.updated_at.isoformat()
         }
 
-    def generate_care_plan_by_caretaker(
-        self,
-        current_user: User,
-        plan_duration_days: int = 7,
-        regenerate: bool = False
-    ) -> Dict[str, Any]:
-        """
-        Generate care plan for the patient assigned to the caretaker.
-        Also updates caretaker's is_first_login to False if it was True.
-        """
-        # Get assigned patient
-        patient = self.user_repo.get_assigned_patient(current_user.user_id)
-        if not patient:
-            raise CustomException(
-                http_code=404,
-                code='404',
-                message='No patient assigned to this caretaker.'
-            )
-
-        # Update caretaker's is_first_login to False after first care plan generation
-        if current_user.is_first_login:
-            current_user.is_first_login = False
-            self.user_repo.update(current_user)
-            logger.info(f"Updated is_first_login=False for caretaker {current_user.user_id}")
-        
-        # Also update patient's is_first_login
-        if patient.is_first_login:
-            patient.is_first_login = False
-            self.user_repo.update(patient)
-            logger.info(f"Updated is_first_login=False for patient {patient.user_id}")
-
-        return self.generate_care_plan_for_patient(
-            patient_id=patient.user_id,
-            caretaker_id=current_user.user_id,
-            plan_duration_days=plan_duration_days,
-            regenerate=regenerate
-        )
-
     def update_care_plan_by_caretaker(
         self,
         current_user: User,
@@ -592,6 +558,11 @@ class CarePlanService:
         result['total_tasks'] += len(created_caretaker_tasks)
 
         logger.info(f"Generated care plan with {result['total_tasks']} total tasks ({result['tasks_created']} patient + {len(created_caretaker_tasks)} caretaker)")
+
+        # Update is_first_login to False for caretaker after successful generation
+        # Note: Patient doesn't need is_first_login flow (created with is_first_login=False)
+        logger.info(f"[FIRST_LOGIN] Marking first login completed for caretaker {current_user.user_id}")
+        self.user_service.mark_first_login_completed(current_user)
 
         return result
 

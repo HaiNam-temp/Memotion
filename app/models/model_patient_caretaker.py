@@ -6,5 +6,5 @@ class PatientCaretaker(Base):
     __tablename__ = "patient_caretaker"
 
     patient_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
-    caretaker_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), unique=True, nullable=False)
+    caretaker_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True, nullable=False)
     assigned_at = Column(DateTime, default=func.now())

@@ -106,7 +106,7 @@ class UserService:
                 phone=data.patient_phone,
                 is_active=True,
                 role=UserRole.PATIENT.value,
-                is_first_login=True,
+                is_first_login=False,  # Patient doesn't need first login flow (no generate task permission)
             )
             created_patient = self.user_repo.create(patient_user)
             
@@ -198,7 +198,7 @@ class UserService:
             phone=data.patient_phone,
             is_active=True,
             role=UserRole.PATIENT.value,
-            is_first_login=True,
+            is_first_login=False,  # Patient doesn't need first login flow (no generate task permission)
         )
         
         created_patient = self.user_repo.create(new_patient)
@@ -211,4 +211,32 @@ class UserService:
         
         logger.info(f"Patient created by caretaker: patient_id={created_patient.user_id}, caretaker_id={current_user.user_id}")
         return created_patient
+
+    def mark_first_login_completed(self, user: User) -> bool:
+        """
+        Mark user's first login as completed by setting is_first_login to False.
+        This is typically called after successful care plan generation.
+        
+        Args:
+            user: User object to update
+            
+        Returns:
+            bool: True if updated successfully, False if already completed
+        """
+        logger.info(f"[FIRST_LOGIN] Checking is_first_login for user {user.user_id} (email: {user.email})")
+        logger.info(f"[FIRST_LOGIN] Current is_first_login value: {user.is_first_login}")
+        
+        if not user.is_first_login:
+            logger.info(f"[FIRST_LOGIN] User {user.user_id} already has is_first_login=False, skipping update")
+            return False
+        
+        try:
+            user.is_first_login = False
+            updated_user = self.user_repo.update(user)
+            logger.info(f"[FIRST_LOGIN] Successfully updated is_first_login=False for user {user.user_id}")
+            logger.info(f"[FIRST_LOGIN] Verified after update: is_first_login={updated_user.is_first_login}")
+            return True
+        except Exception as e:
+            logger.error(f"[FIRST_LOGIN] Failed to update is_first_login for user {user.user_id}: {str(e)}")
+            raise
 
